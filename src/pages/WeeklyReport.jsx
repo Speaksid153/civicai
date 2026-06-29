@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps, react-hooks/immutability, no-undef */
+/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps, react-hooks/immutability */
 import { useEffect, useState } from "react";
 import { Type } from "@google/genai";
 import { Link } from "react-router-dom";
@@ -162,7 +162,7 @@ export default function WeeklyReport() {
         reportsByDepartment: getReportsByDepartment(weekReports),
         reportsByStatus: getReportsByStatus(weekReports),
         reportsByDay: getReportsByDay(weekReports),
-        averageResolutionTime: getAverageResolutionTime(weekReports),
+        averageResolutionTime: formatDuration(getAverageResolutionTime(weekReports)),
         resolutionRate: getResolutionRate(weekReports),
         week: selectedWeekObj.label
       };

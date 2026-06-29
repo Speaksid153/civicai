@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage } from "firebase/storage";
 
 import {
   getFirestore,
@@ -36,29 +36,6 @@ export const auth = getAuth(app);
 // Storage
 export const storage = getStorage(app);
 
-// ==============================
-// IMAGE UPLOAD HELPER
-// ==============================
-
-export async function uploadImage(file) {
-  if (!file) return null;
-
-  try {
-    // Create a unique filename
-    const filename = `reports/${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, filename);
-
-    // Upload file
-    await uploadBytes(storageRef, file);
-
-    // Get download URL
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    throw error;
-  }
-}
 
 // ==============================
 // CREATE REPORT

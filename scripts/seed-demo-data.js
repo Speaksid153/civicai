@@ -435,7 +435,7 @@ function generateDuplicates() {
     "Koramangala junction pothole causing damage to vehicles. Please fix urgently.",
     "Yet another report for the junction pothole in Koramangala — it is a safety emergency.",
   ];
-  return variants.map((description, i) => {
+  return variants.map((description) => {
     const coord     = randomCoord(cluster);
     const daysAgo   = randomBetween(2, 14);
     const createdAt = timestampDaysAgo(daysAgo);

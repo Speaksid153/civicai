@@ -3,9 +3,6 @@ export default function DashboardStats({
   pending,
   assigned,
   resolved,
-  archived,
-  resolutionRate,
-  averageResolutionTime,
 }) {
   const stats = [
     {

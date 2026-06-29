@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import DashboardStats from "../components/DashboardStats";
 import SearchBar from "../components/SearchBar";
@@ -20,7 +19,6 @@ import {
 
 import {
   observeAuth,
-  logoutUser,
   getCurrentUser,
 } from "../services/auth";
 
@@ -36,6 +34,7 @@ export default function AuthorityDashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
+  const [activeTab, setActiveTab] = useState("pending");
 
   const [selectedReport, setSelectedReport] =
     useState(null);
@@ -137,14 +136,6 @@ export default function AuthorityDashboard() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      await logoutUser();
-    } catch (err) {
-      console.error(err);
-      showToast("Unable to log out.", "error");
-    }
-  }
 
   if (!user) {
     return (
@@ -266,39 +257,67 @@ export default function AuthorityDashboard() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "32px", marginTop: "32px" }}>
-              <ReportSection
-                title="Pending Reports"
-                reports={filterReports(pending)}
-                onAssign={(report) => {
-                  setMapReport(report);
-                  handleAssignClick(report);
-                }}
-                onResolve={(report) => {
-                  setMapReport(report);
-                  setResolutionReport(report);
-                }}
-                onSelect={setMapReport}
-                emptyMessage="No pending reports right now."
-              />
+              {/* Tab Bar */}
+              <div style={{ display: "flex", gap: "12px", borderBottom: "1px solid var(--color-divider)", paddingBottom: "16px" }}>
+                <button
+                  onClick={() => setActiveTab("pending")}
+                  className={`ds-btn ${activeTab === "pending" ? "ds-btn-primary" : "ds-btn-secondary"}`}
+                >
+                  Pending ({pending.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("assigned")}
+                  className={`ds-btn ${activeTab === "assigned" ? "ds-btn-primary" : "ds-btn-secondary"}`}
+                >
+                  Assigned ({assigned.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("resolved")}
+                  className={`ds-btn ${activeTab === "resolved" ? "ds-btn-primary" : "ds-btn-secondary"}`}
+                >
+                  Resolved ({resolved.length})
+                </button>
+              </div>
 
-              <ReportSection
-                title="Assigned Reports"
-                reports={filterReports(assigned)}
-                onResolve={(report) => {
-                  setMapReport(report);
-                  setResolutionReport(report);
-                }}
-                onSelect={setMapReport}
-                emptyMessage="No assigned reports right now."
-              />
+              {activeTab === "pending" && (
+                <ReportSection
+                  title="Pending Reports"
+                  reports={filterReports(pending)}
+                  onAssign={(report) => {
+                    setMapReport(report);
+                    handleAssignClick(report);
+                  }}
+                  onResolve={(report) => {
+                    setMapReport(report);
+                    setResolutionReport(report);
+                  }}
+                  onSelect={setMapReport}
+                  emptyMessage="No pending reports right now."
+                />
+              )}
 
-              <ReportSection
-                title="Resolved Reports"
-                reports={filterReports(resolved)}
-                onArchive={handleArchive}
-                onSelect={setMapReport}
-                emptyMessage="No resolved reports waiting for archive."
-              />
+              {activeTab === "assigned" && (
+                <ReportSection
+                  title="Assigned Reports"
+                  reports={filterReports(assigned)}
+                  onResolve={(report) => {
+                    setMapReport(report);
+                    setResolutionReport(report);
+                  }}
+                  onSelect={setMapReport}
+                  emptyMessage="No assigned reports right now."
+                />
+              )}
+
+              {activeTab === "resolved" && (
+                <ReportSection
+                  title="Resolved Reports"
+                  reports={filterReports(resolved)}
+                  onArchive={handleArchive}
+                  onSelect={setMapReport}
+                  emptyMessage="No resolved reports waiting for archive."
+                />
+              )}
             </div>
           )}
         </main>

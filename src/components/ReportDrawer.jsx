@@ -8,9 +8,8 @@ import {
   limit,
   getDocs,
 } from "firebase/firestore";
-import { db, uploadImage, addReport } from "../services/firebase";
-import { ai, analyzeReport, analyzeReportWithImage } from "../services/ai";
-import { Type } from "@google/genai";
+import { db, addReport } from "../services/firebase";
+import { analyzeAndCheckDuplicates } from "../services/ai";
 
 export default function ReportDrawer({
   drawerOpen,
@@ -29,12 +28,6 @@ export default function ReportDrawer({
   const [potentialDuplicates, setPotentialDuplicates] = useState([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [checkedForDuplicates, setCheckedForDuplicates] = useState(false);
-
-  // Image handling state
-  const [imageFile, setImageFile] = useState(null);
-  const [imageUrl, setImageUrl] = useState(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [imageError, setImageError] = useState(null);
 
   // AI Analysis Review state
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -90,14 +83,15 @@ export default function ReportDrawer({
         return distance <= 1.0; // Within 1km
       });
 
-      if (nearbyReports.length > 0 && description.trim().length > 10) {
-        // Use Gemini to check for semantic similarity
-        const aiResponse = await checkDuplicateWithAI(
+      if (description.trim().length > 10) {
+        // Use single Gemini call for both duplicates and classification
+        const aiResponse = await analyzeAndCheckDuplicates(
           description,
           nearbyReports
         );
         setPotentialDuplicates(aiResponse.duplicates || []);
         setShowDuplicateWarning(aiResponse.isLikelyDuplicate || false);
+        setAiAnalysis(aiResponse); // Save analysis for next step
       } else {
         setPotentialDuplicates([]);
         setShowDuplicateWarning(false);
@@ -112,96 +106,7 @@ export default function ReportDrawer({
     }
   };
 
-  // Use AI to check for semantic similarity between new report and existing ones
-  const checkDuplicateWithAI = async (newDescription, nearbyReports) => {
-    try {
-      // Prepare nearby reports description for AI
-      const nearbyDescriptions = nearbyReports
-        .map(
-          (report, index) => `
-        Report ${index + 1} (ID: ${report.id}):
-        Description: "${report.description}"
-        Category: ${report.category || "Unknown"}
-        Reported: ${new Date(
-          report.createdAt?.seconds * 1000 || report.createdAt
-        ).toLocaleString()}
-      `
-        )
-        .join("\n");
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `
-        You are an AI assistant for CivicAI, a civic issue reporting system.
-        Compare the NEW citizen report with the LIST of EXISTING nearby reports to detect potential duplicates.
-
-        NEW REPORT:
-        "${newDescription}"
-
-        NEARBY REPORTS (within 1km, from past 7 days):
-        ${nearbyDescriptions}
-
-        TASK:
-        - Determine if the NEW report is substantially similar to any existing report
-        - For each similar report, provide a similarity score (0-100) and explanation
-        - Determine if user should submit new report or update existing one
-
-        RETURN ONLY VALID MATCHING THIS JSON SCHEMA:
-        {
-          "duplicates": [
-            {
-              "reportId": "string (Firestore document ID)",
-              "similarityScore": number (0-100),
-              "suggestion": "string explaining why these are similar"
-            }
-          ],
-          "isLikelyDuplicate": boolean (true if ANY similarityScore >= 80),
-          "recommendation": "string (either 'submit_new' or 'update_existing:<reportId>')"
-        }
-
-        RULES:
-        - Only consider reports with similarityScore >= 60 as potential duplicates
-        - Be conservative - when in doubt, recommend submitting new report
-        - Focus on semantic meaning, not just exact text matches
-        - Consider location proximity as part of similarity assessment
-        `,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              duplicates: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    reportId: { type: Type.STRING },
-                    similarityScore: { type: Type.NUMBER },
-                    suggestion: { type: Type.STRING },
-                  },
-                  required: ["reportId", "similarityScore", "suggestion"],
-                },
-              },
-              isLikelyDuplicate: { type: Type.BOOLEAN },
-              recommendation: { type: Type.STRING },
-            },
-            required: ["duplicates", "isLikelyDuplicate", "recommendation"],
-          },
-        },
-      });
-
-      const result = JSON.parse(response.text);
-      return result;
-    } catch (error) {
-      console.error("AI duplicate check failed:", error);
-      // Return safe default - allow submission
-      return {
-        duplicates: [],
-        isLikelyDuplicate: false,
-        recommendation: "submit_new",
-      };
-    }
-  };
 
   // Handle form submission with duplicate check, image upload, and AI analysis
   const handleDuplicatedSubmit = async (e) => {
@@ -244,24 +149,13 @@ export default function ReportDrawer({
       // Set submission state
       setSubmitRunning(true);
 
-      // Upload image if present
-      let finalImageUrl = null;
-      if (imageFile) {
-        setUploadingImage(true);
-        try {
-          finalImageUrl = await uploadImage(imageFile);
-        } finally {
-          setUploadingImage(false);
-        }
+      // We already fetched AI analysis during checkForDuplicates!
+      // If by some edge case we didn't (e.g., short description), fetch it now
+      if (!aiAnalysis) {
+        const aiResponse = await analyzeAndCheckDuplicates(description, []);
+        setAiAnalysis(aiResponse);
       }
 
-      // Perform AI analysis (with image if available)
-      const aiAnalysisResult = finalImageUrl
-        ? await analyzeReportWithImage(description, finalImageUrl)
-        : await analyzeReport(description);
-
-      // Store the AI analysis for review
-      setAiAnalysis(aiAnalysisResult);
       setShowAiReview(true);
     } catch (error) {
       console.error("Error submitting report:", error);
@@ -284,7 +178,7 @@ export default function ReportDrawer({
           latitude: location.latitude,
           longitude: location.longitude,
         },
-        imageUrl: imageUrl,
+        imageUrl: null,
         // Store both AI suggestion and final decision for audit trail
         ai: {
           ...aiAnalysis, // Original AI suggestion
@@ -314,9 +208,6 @@ export default function ReportDrawer({
       // Reset form
       setDescription("");
       setCategory(""); // Reset category dropdown
-      setImageFile(null);
-      setImageUrl(null);
-      setImageError(null);
 
       // Close drawer and reset review state
       setDrawerOpen(false);
@@ -340,54 +231,10 @@ export default function ReportDrawer({
     setAiAnalysis(null);
   };
 
-  // Handle image file selection
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setImageError('Please select an image file');
-        setImageFile(null);
-        setImageUrl(null);
-        return;
-      }
-
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        setImageError('Image file too large (max 5MB)');
-        setImageFile(null);
-        setImageUrl(null);
-        return;
-      }
-
-      setImageFile(file);
-      setImageError(null);
-
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file);
-      setImageUrl(previewUrl);
-    } else {
-      setImageFile(null);
-      setImageUrl(null);
-      setImageError(null);
-    }
-  };
-
-  // Remove image
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImageUrl(null);
-    setImageError(null);
-    // Revoke object URL to prevent memory leaks
-    if (imageUrl) {
-      URL.revokeObjectURL(imageUrl);
-    }
-  };
-
   return (
     <div
       className={`ds-drawer h-[70vh] ${
-        duplicateCheckRunning || showDuplicateWarning || uploadingImage || drawerOpen
+        duplicateCheckRunning || showDuplicateWarning || drawerOpen
           ? ""
           : "ds-drawer-closed"
       }`}
@@ -447,7 +294,7 @@ export default function ReportDrawer({
       )}
 
       {/* Loading indicator for submission process */}
-      {submitRunning && !showDuplicateWarning && !uploadingImage && (
+      {submitRunning && !showDuplicateWarning && (
         <div style={{ padding: "16px", backgroundColor: "var(--color-primary-pastel)", borderLeft: "4px solid var(--color-primary)", margin: "0 24px 16px", textAlign: "center" }}>
           <div className="ds-flex-center" style={{ gap: "8px" }}>
             <span className="material-symbols-outlined" style={{ animation: "ds-skeleton-shimmer 1.5s infinite", color: "var(--color-primary)" }}>sync</span>
@@ -456,33 +303,13 @@ export default function ReportDrawer({
         </div>
       )}
 
-      {/* Image upload progress */}
-      {uploadingImage && !showDuplicateWarning && (
-        <div style={{ padding: "16px", backgroundColor: "var(--color-teal-pastel)", borderLeft: "4px solid var(--color-teal)", margin: "0 24px 16px", textAlign: "center" }}>
-          <div className="ds-flex-center" style={{ gap: "8px" }}>
-            <span className="material-symbols-outlined" style={{ animation: "ds-skeleton-shimmer 1.5s infinite", color: "var(--color-teal)" }}>cloud_upload</span>
-            <span className="ds-body" style={{ color: "var(--color-teal)", fontWeight: "var(--font-weight-medium)" }}>Uploading image...</span>
-          </div>
-        </div>
-      )}
-
-    {/* Image error */}
-    {imageError && (
-      <div style={{ padding: "16px", backgroundColor: "var(--color-error-pastel)", borderLeft: "4px solid var(--color-error)", margin: "0 24px 16px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-          <span className="material-symbols-outlined" style={{ color: "var(--color-error)" }}>error</span>
-          <span className="ds-body" style={{ color: "var(--color-error)" }}>{imageError}</span>
-        </div>
-      </div>
-    )}
-
     {/* Scrollable Content */}
     <div className="overflow-y-auto" style={{ height: "calc(70vh - 75px)", padding: "24px" }}>
       {/* Show AI Review screen if active */}
       {showAiReview && aiAnalysis && (
         <AIAnalysisReview
           description={description}
-          imageUrl={imageUrl}
+          imageUrl={null}
           aiAnalysis={aiAnalysis}
           onSubmit={handleAiReviewSubmit}
           onCancel={handleAiReviewCancel}
@@ -501,7 +328,12 @@ export default function ReportDrawer({
             <textarea
               rows={4}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setCheckedForDuplicates(false);
+                setShowDuplicateWarning(false);
+                setAiAnalysis(null);
+              }}
               placeholder="Describe the issue..."
               className="ds-textarea"
             />
@@ -564,56 +396,6 @@ export default function ReportDrawer({
             </div>
           </div>
 
-          {/* Image Upload Section */}
-          <div>
-            <label className="ds-input-label">
-              Add Photo (Optional)
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {/* Image Preview/Upload */}
-              <div style={{ border: "2px dashed var(--color-input-border)", borderRadius: "var(--radius-card)", padding: "16px", textAlign: "center", cursor: "pointer", transition: "border-color 150ms ease" }}
-                   onClick={() => document.getElementById('imageUpload').click()}
-                   onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-                   onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--color-input-border)'}
-                   >
-                {imageUrl ? (
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    style={{ maxWidth: "100%", maxHeight: "200px", objectFit: "contain", borderRadius: "8px" }}
-                  />
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: "32px", color: "var(--color-text-secondary)" }}>cloud_upload</span>
-                    <p className="ds-body" style={{ color: "var(--color-text-secondary)", margin: 0 }}>Click to upload or drag & drop</p>
-                    <p className="ds-label" style={{ margin: 0 }}>Max 5MB • JPG, PNG, GIF</p>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  id="imageUpload"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleImageChange}
-                />
-              </div>
-
-              {/* Image controls */}
-              {imageUrl && (
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                  <button
-                    onClick={handleRemoveImage}
-                    className="ds-btn ds-btn-danger"
-                    style={{ height: "32px", padding: "0 12px", fontSize: "12px" }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Buttons */}
           <div className="ds-flex-between" style={{ marginTop: "16px", paddingTop: "24px", borderTop: "1px solid var(--color-divider)" }}>
             <button
@@ -624,10 +406,10 @@ export default function ReportDrawer({
             </button>
             <button
               onClick={handleDuplicatedSubmit}
-              disabled={submitRunning || uploadingImage}
+              disabled={submitRunning}
               className="ds-btn ds-btn-primary"
             >
-              {submitRunning || uploadingImage ? "Submitting..." : "Submit Report"}
+              {submitRunning ? "Submitting..." : "Submit Report"}
             </button>
           </div>
         </div>

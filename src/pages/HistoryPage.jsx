@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import ReportCard from "../components/ReportCard";
 import SearchBar from "../components/SearchBar";
@@ -8,7 +7,7 @@ import Toast from "../components/Toast";
 
 import { getArchivedReports } from "../services/firebase";
 import AuthorityNav from "../components/AuthorityNav";
-import { getCurrentUser, logoutUser } from "../services/auth";
+import { getCurrentUser } from "../services/auth";
 import {
   formatDateInput,
   formatTimestamp,
@@ -68,17 +67,6 @@ export default function HistoryPage() {
     };
   }, []);
 
-  async function handleLogout() {
-    try {
-      await logoutUser();
-    } catch (err) {
-      console.error(err);
-      setToast({
-        type: "error",
-        message: "Unable to log out.",
-      });
-    }
-  }
 
   const officers = uniqueValues(
     reports,

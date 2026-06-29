@@ -1,8 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
+import { runLocalFallback } from "./fallbackClassifier";
+import { generateContentWithFallback } from "./providers/providerChain";
 
-export const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY,
-});
+export const ai = {
+  models: {
+    generateContent: async (options) => {
+      return await generateContentWithFallback(options);
+    }
+  }
+};
+
+const sessionCache = new Map();
 
 const fallbackAnalysis = {
   category: "Other",
@@ -117,259 +125,116 @@ function normalizeAnalysis(result) {
 }
 
 /**
- * Analyze a report using only text description (existing functionality)
+ * Analyze a report and check for duplicates in a single API call
  */
-export async function analyzeReport(description) {
+export async function analyzeAndCheckDuplicates(description, nearbyReports = []) {
+  const cacheKey = (description || "").trim().toLowerCase();
+  
+  if (sessionCache.has(cacheKey)) {
+    return sessionCache.get(cacheKey);
+  }
+
   try {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
       throw new Error("Missing VITE_GEMINI_API_KEY.");
     }
 
+    const nearbyDescriptions = nearbyReports.length > 0 
+      ? nearbyReports.map((report) => `
+        Report ID: ${report.id}
+        Description: "${report.description}"
+        Category: ${report.category || "Unknown"}
+      `).join("\n")
+      : "No nearby reports.";
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-
       contents: `
-You are an AI assistant for an Indian civic issue reporting system.
+You are an AI assistant for CivicAI.
+Evaluate this NEW report for both classification and duplicate detection against EXISTING nearby reports.
 
-Analyze this complaint:
-
+NEW REPORT:
 "${description}"
 
-Return only valid JSON matching the schema.
+NEARBY REPORTS:
+${nearbyDescriptions}
+
+RETURN ONLY VALID JSON MATCHING THE SCHEMA.
 
 Rules:
+- duplicates: array of similar reports (similarityScore >= 60). Focus on semantic meaning.
+- isLikelyDuplicate: true if any similarityScore >= 80.
+- recommendation: 'submit_new' or 'update_existing:<reportId>'. Be conservative.
 - category must be one of: Road, Garbage, Water, Electricity, Drainage, Other
 - department must be one of: BBMP Roads, BBMP Sanitation, BWSSB, BESCOM, Traffic Police
 - priority must be one of: Low, Medium, High, Critical
 - summary must be one concise sentence for an authority dashboard
-- confidence must be a number from 0 to 100
-- imageDescriptionAlignment: Assess if description matches what would be visible in an image (if provided)
-- authenticityAssessment: Evaluate if the report appears genuine based on description
-- visibleHazards: List specific hazards visible or implied (e.g., ["pothole", "exposed wiring", "standing water"])
-- severityEstimate: Assess severity based on description (Low/Medium/High/Critical)
-- priorityExplanation: Brief explanation for the priority assignment
-- recommendedDepartment: Suggested department based on issue type
-- urgencyIndicators: List of urgency indicators from description (e.g., ["emergency", "hazard", "blocking traffic"])
+- visibleHazards: List specific hazards visible or implied
+- severityEstimate: Assess severity (Low/Medium/High/Critical)
+- priorityExplanation: Brief explanation for priority
+- urgencyIndicators: List of urgency indicators from description
 `,
-
       config: {
         responseMimeType: "application/json",
-
         responseSchema: {
           type: Type.OBJECT,
-
           properties: {
-            category: {
-              type: Type.STRING,
-              enum: allowedCategories,
-            },
-
-            department: {
-              type: Type.STRING,
-              enum: allowedDepartments,
-            },
-
-            priority: {
-              type: Type.STRING,
-              enum: allowedPriorities,
-            },
-
-            summary: {
-              type: Type.STRING,
-            },
-
-            confidence: {
-              type: Type.NUMBER,
-            },
-            // Enhanced fields
-            imageDescriptionAlignment: {
-              type: Type.STRING,
-            },
-            authenticityAssessment: {
-              type: Type.STRING,
-            },
-            visibleHazards: {
+            duplicates: {
               type: Type.ARRAY,
-              items: { type: Type.STRING },
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  reportId: { type: Type.STRING },
+                  similarityScore: { type: Type.NUMBER },
+                  suggestion: { type: Type.STRING },
+                },
+                required: ["reportId", "similarityScore", "suggestion"],
+              },
             },
-            severityEstimate: {
-              type: Type.STRING,
-              enum: ["Low", "Medium", "High", "Critical", "Unable to assess"]
-            },
-            priorityExplanation: {
-              type: Type.STRING,
-            },
-            recommendedDepartment: {
-              type: Type.STRING,
-              enum: allowedDepartments,
-            },
-            urgencyIndicators: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
+            isLikelyDuplicate: { type: Type.BOOLEAN },
+            recommendation: { type: Type.STRING },
+            category: { type: Type.STRING, enum: allowedCategories },
+            department: { type: Type.STRING, enum: allowedDepartments },
+            priority: { type: Type.STRING, enum: allowedPriorities },
+            summary: { type: Type.STRING },
+            confidence: { type: Type.NUMBER },
+            visibleHazards: { type: Type.ARRAY, items: { type: Type.STRING } },
+            severityEstimate: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical", "Unable to assess"] },
+            priorityExplanation: { type: Type.STRING },
+            recommendedDepartment: { type: Type.STRING, enum: allowedDepartments },
+            urgencyIndicators: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-
           required: [
-            "category",
-            "department",
-            "priority",
-            "summary",
-            "confidence",
-            "imageDescriptionAlignment",
-            "authenticityAssessment",
-            "visibleHazards",
-            "severityEstimate",
-            "priorityExplanation",
-            "recommendedDepartment",
-            "urgencyIndicators",
+            "duplicates", "isLikelyDuplicate", "recommendation",
+            "category", "department", "priority", "summary", "confidence",
+            "visibleHazards", "severityEstimate", "priorityExplanation",
+            "recommendedDepartment", "urgencyIndicators"
           ],
         },
       },
     });
 
-    return normalizeAnalysis(parseJsonResponse(response.text));
+    const parsed = parseJsonResponse(response.text);
+    const analysisPart = normalizeAnalysis(parsed);
+    
+    const finalResult = {
+      duplicates: parsed.duplicates || [],
+      isLikelyDuplicate: !!parsed.isLikelyDuplicate,
+      recommendation: parsed.recommendation || "submit_new",
+      ...analysisPart
+    };
 
-  } catch (error) {
-    console.error("Gemini analysis failed:", error);
-    return fallbackAnalysis;
-  }
-}
+    sessionCache.set(cacheKey, finalResult);
+    return finalResult;
 
-/**
- * Analyze a report using both text description and image
- * @param {string} description - Text description of the issue
- * @param {string} imageUrl - URL of the uploaded image (Firebase Storage download URL)
- * @returns {Promise<Object>} Analysis results with enhanced fields
- */
-export async function analyzeReportWithImage(description, imageUrl) {
-  try {
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
-      throw new Error("Missing VITE_GEMINI_API_KEY.");
-    }
-
-    // Prepare the multimodal content
-    const contents = [
-      {
-        text: `
-You are an AI assistant for an Indian civic issue reporting system.
-Analyze this civic issue using BOTH the description and the image provided.
-
-Description: "${description || 'No description provided'}"
-
-[IMAGE PROVIDED FOR ANALYSIS]
-
-Return only valid JSON matching the schema.
-
-Rules:
-- category must be one of: Road, Garbage, Water, Electricity, Drainage, Other
-- department must be one of: BBMP Roads, BBMP Sanitation, BWSSB, BESCOM, Traffic Police
-- priority must be one of: Low, Medium, High, Critical
-- summary must be one concise sentence for an authority dashboard
-- confidence must be a number from 0 to 100
-- imageDescriptionAlignment: Assess how well the image matches the description (e.g., "Image shows pothole matching description", "Description mentions trash but image shows standing water")
-- authenticityAssessment: Evaluate if the report appears genuine based on image and description (e.g., "Appears genuine - shows clear infrastructure issue", "Possibly staged - unusual angle", "Image unclear")
-- visibleHazards: List specific hazards VISIBLE in the image (e.g., ["deep pothole", "broken glass", "exposed rebar", "flooding"])
-- severityEstimate: Assess severity based on VISUAL evidence (Low/Medium/High/Critical)
-- priorityExplanation: Brief explanation for the priority assignment based on visual evidence
-- recommendedDepartment: Suggested department based on what's visible in image
-- urgencyIndicators: List of urgency VISUALLY observable (e.g., ["blocking emergency access", "electrical hazard", "immediate flood risk"])
-`
-      },
-    ];
-
-    // Add image if URL is provided
-    if (imageUrl) {
-      contents.push({
-        fileData: {
-          fileUri: imageUrl,
-          mimeType: "image/jpeg" // Assuming JPEG, could detect from URL or file type
-        }
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-
-      config: {
-        responseMimeType: "application/json",
-
-        responseSchema: {
-          type: Type.OBJECT,
-
-          properties: {
-            category: {
-              type: Type.STRING,
-              enum: allowedCategories,
-            },
-
-            department: {
-              type: Type.STRING,
-              enum: allowedDepartments,
-            },
-
-            priority: {
-              type: Type.STRING,
-              enum: allowedPriorities,
-            },
-
-            summary: {
-              type: Type.STRING,
-            },
-
-            confidence: {
-              type: Type.NUMBER,
-            },
-            // Enhanced fields
-            imageDescriptionAlignment: {
-              type: Type.STRING,
-            },
-            authenticityAssessment: {
-              type: Type.STRING,
-            },
-            visibleHazards: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-            severityEstimate: {
-              type: Type.STRING,
-              enum: ["Low", "Medium", "High", "Critical", "Unable to assess"]
-            },
-            priorityExplanation: {
-              type: Type.STRING,
-            },
-            recommendedDepartment: {
-              type: Type.STRING,
-              enum: allowedDepartments,
-            },
-            urgencyIndicators: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-
-          required: [
-            "category",
-            "department",
-            "priority",
-            "summary",
-            "confidence",
-            "imageDescriptionAlignment",
-            "authenticityAssessment",
-            "visibleHazards",
-            "severityEstimate",
-            "priorityExplanation",
-            "recommendedDepartment",
-            "urgencyIndicators",
-          ],
-        },
-      },
-    });
-
-    return normalizeAnalysis(parseJsonResponse(response.text));
-
-  } catch (error) {
-    console.error("Gemini vision analysis failed:", error);
-    return fallbackAnalysis;
+  } catch (_error) {
+    console.warn("AI providers unavailable — using local fallback.");
+    const fallback = normalizeAnalysis(runLocalFallback(description));
+    return {
+      duplicates: [],
+      isLikelyDuplicate: false,
+      recommendation: "submit_new",
+      ...fallback
+    };
   }
 }

@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps, react-hooks/immutability */
+/* eslint-disable no-unused-vars, react-hooks/immutability */
 import { useEffect, useState } from "react";
 import { Type } from "@google/genai";
 import { Link } from "react-router-dom";
@@ -142,7 +142,7 @@ export default function AIInsightsDashboard() {
           reportsByDepartment: getReportsByDepartment(archivedReports),
           reportsByStatus: getReportsByStatus(archivedReports),
           reportsByMonth: getReportsByMonth(archivedReports),
-          averageResolutionTime: getAverageResolutionTime(archivedReports),
+          averageResolutionTime: formatDuration(getAverageResolutionTime(archivedReports)),
           resolutionRate: getResolutionRate(archivedReports),
         };
 
