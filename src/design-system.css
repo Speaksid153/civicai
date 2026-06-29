@@ -1,0 +1,953 @@
+/* ============================================================
+   CIVICAI DESIGN SYSTEM
+   Version 1.0 — 2026-06-29
+   All pages import this file via src/index.css.
+   Do not edit tokens inline on components. Change them here.
+   ============================================================ */
+
+
+/* ============================================================
+   § 1  DESIGN TOKENS  (CSS Custom Properties)
+   ============================================================ */
+
+:root {
+
+  /* ── Brand Colors ─────────────────────────────────────────── */
+  --color-primary:         #1A3F6F;   /* Navy — CTAs, active nav, focus */
+  --color-primary-dark:    #153457;   /* Navy darkened 8% — button hover */
+  --color-primary-pastel:  #E8EEF6;   /* Navy tint — surface fills */
+
+  --color-amber:           #E67E22;   /* Warnings, medium priority, pending */
+  --color-amber-pastel:    #FDF0E3;   /* Amber tint — pending badge bg */
+
+  --color-teal:            #1D9E75;   /* Success, resolved status */
+  --color-teal-pastel:     #E3F5EF;   /* Teal tint — resolved badge bg */
+
+  --color-error:           #D93025;   /* Google red — high priority, errors */
+  --color-error-pastel:    #FCE8E6;   /* Red tint */
+
+  /* ── Neutral Surface Colors ───────────────────────────────── */
+  --color-bg-app:          #F1EFE8;   /* Warm off-white — page background */
+  --color-bg-surface:      #FFFFFF;   /* Card / panel surface */
+  --color-bg-hover:        #F8F9FA;   /* Table / list row hover */
+  --color-bg-archived:     #F1F3F4;   /* Archived badge background */
+
+  /* ── Text Colors ──────────────────────────────────────────── */
+  --color-text-primary:    #1C1B1F;   /* Headings, body copy */
+  --color-text-secondary:  #5F6368;   /* Labels, captions, secondary text */
+  --color-text-on-primary: #FFFFFF;   /* Text on navy fill */
+  --color-text-archived:   #5F6368;   /* Archived badge text */
+
+  /* ── Border & Divider ─────────────────────────────────────── */
+  --color-divider:         #E8EAED;
+  --color-input-border:    #DADCE0;
+  --color-input-focus:     #1A3F6F;
+  --color-chip-border:     #E8EAED;
+
+  /* ── Priority Dot / Accent Colors ────────────────────────── */
+  --color-priority-high:   #D93025;
+  --color-priority-medium: #E67E22;
+  --color-priority-low:    #1D9E75;
+
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-family:           'Google Sans', 'Inter', sans-serif;
+
+  --font-size-title:       22px;   /* Page titles */
+  --font-size-section:     18px;   /* Section headers */
+  --font-size-card:        16px;   /* Card titles */
+  --font-size-body:        14px;   /* Body copy */
+  --font-size-label:       12px;   /* Labels, chips, badges */
+
+  --font-weight-normal:    400;
+  --font-weight-medium:    500;
+  --font-weight-bold:      700;
+
+  --letter-spacing-label:  0.3px;
+  --line-height-body:      1.5;
+  --line-height-title:     1.3;
+
+
+  /* ── Shadows ──────────────────────────────────────────────── */
+  --shadow-card:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-search:  0 1px 3px rgba(0,0,0,0.10);
+  --shadow-inset:   inset 0 2px 4px rgba(0,0,0,0.06);
+
+
+  /* ── Border Radii ─────────────────────────────────────────── */
+  --radius-card:    12px;
+  --radius-button:  8px;
+  --radius-pill:    99px;
+  --radius-input:   8px;
+  --radius-chip:    8px;
+  --radius-search:  24px;
+  --radius-drawer:  16px;   /* top-left + top-right only on drawers/modals */
+
+
+  /* ── Layout Constants ─────────────────────────────────────── */
+  --layout-max-width:          1200px;
+  --layout-padding-desktop:    32px;
+  --layout-padding-mobile:     16px;
+  --layout-card-padding:       24px;
+  --layout-card-gap:           16px;
+  --layout-sidebar-collapsed:  64px;
+  --layout-sidebar-expanded:   240px;
+
+
+  /* ── Icon Sizes ───────────────────────────────────────────── */
+  --icon-size-standard:  20px;
+  --icon-size-nav:       22px;
+  --icon-size-feature:   28px;
+
+
+  /* ── Transitions ──────────────────────────────────────────── */
+  --transition-hover:  background-color 150ms ease;
+  --transition-border: border-color 150ms ease;
+  --transition-page:   opacity 300ms cubic-bezier(0.2, 0, 0, 1),
+                       transform 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+
+/* ============================================================
+   § 2  BASE RESET & GLOBAL DEFAULTS
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family:   var(--font-family);
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-normal);
+  line-height:   var(--line-height-body);
+  color:         var(--color-text-primary);
+  background:    var(--color-bg-app);
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── Material Symbols icon sizing helper ────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+  font-size: var(--icon-size-standard);
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.material-symbols-outlined.icon-nav     { font-size: var(--icon-size-nav); }
+.material-symbols-outlined.icon-feature { font-size: var(--icon-size-feature); }
+
+
+/* ============================================================
+   § 3  LAYOUT UTILITIES
+   ============================================================ */
+
+/* Full-page wrapper sets the app background */
+.ds-page {
+  min-height: 100vh;
+  background: var(--color-bg-app);
+}
+
+/* Centered content column */
+.ds-container {
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+  padding-inline: var(--layout-padding-desktop);
+}
+
+@media (max-width: 768px) {
+  .ds-container {
+    padding-inline: var(--layout-padding-mobile);
+  }
+}
+
+/* Hero gradient — allowed on landing sections only */
+.ds-hero-gradient {
+  background: linear-gradient(135deg, var(--color-bg-app) 0%, var(--color-primary-pastel) 100%);
+}
+
+
+/* ============================================================
+   § 4  CARD
+   ============================================================ */
+
+.ds-card {
+  background:    var(--color-bg-surface);
+  border-radius: var(--radius-card);
+  box-shadow:    var(--shadow-card);
+  padding:       var(--layout-card-padding);
+}
+
+/* Secondary card with neumorphic inset feel */
+.ds-card-inset {
+  background:    var(--color-bg-app);
+  border-radius: var(--radius-card);
+  box-shadow:    var(--shadow-inset);
+  padding:       var(--layout-card-padding);
+}
+
+/* Priority left-border accent (4px) */
+.ds-card-priority-high   { border-left: 4px solid var(--color-priority-high); }
+.ds-card-priority-medium { border-left: 4px solid var(--color-priority-medium); }
+.ds-card-priority-low    { border-left: 4px solid var(--color-priority-low); }
+
+
+/* ============================================================
+   § 5  TYPOGRAPHY UTILITIES
+   ============================================================ */
+
+.ds-title   {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-title);
+  color: var(--color-text-primary);
+}
+
+.ds-section-header {
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-title);
+  color: var(--color-text-primary);
+}
+
+.ds-card-title {
+  font-size: var(--font-size-card);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.ds-body {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-primary);
+}
+
+.ds-label {
+  font-size:      var(--font-size-label);
+  font-weight:    var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-secondary);
+}
+
+.ds-secondary {
+  color: var(--color-text-secondary);
+}
+
+
+/* ============================================================
+   § 6  BUTTONS
+   ============================================================ */
+
+/* Shared button base */
+.ds-btn {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             8px;
+  border:          none;
+  cursor:          pointer;
+  font-family:     var(--font-family);
+  font-size:       var(--font-size-body);
+  font-weight:     var(--font-weight-medium);
+  border-radius:   var(--radius-button);
+  padding:         0 20px;
+  height:          40px;
+  text-decoration: none;
+  transition:      var(--transition-hover);
+  white-space:     nowrap;
+  letter-spacing:  0.1px;
+}
+
+.ds-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Primary — navy fill */
+.ds-btn-primary {
+  background: var(--color-primary);
+  color:      var(--color-text-on-primary);
+}
+
+.ds-btn-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+/* Secondary — outlined navy */
+.ds-btn-secondary {
+  background: transparent;
+  color:      var(--color-primary);
+  border:     1.5px solid var(--color-primary);
+}
+
+.ds-btn-secondary:hover {
+  background: var(--color-primary-pastel);
+}
+
+/* Danger — error red fill */
+.ds-btn-danger {
+  background: var(--color-error);
+  color:      var(--color-text-on-primary);
+}
+
+.ds-btn-danger:hover {
+  background: #b5281f; /* error darkened 8% */
+}
+
+/* Teal — success actions (Resolve, Mark Complete) */
+.ds-btn-teal {
+  background: var(--color-teal);
+  color:      var(--color-text-on-primary);
+}
+
+.ds-btn-teal:hover {
+  background: #178a64; /* teal darkened 8% */
+}
+
+/* Pill CTA — for CitizenHub hero only */
+.ds-btn-pill-cta {
+  background:    var(--color-primary);
+  color:         var(--color-text-on-primary);
+  border-radius: 24px;
+  height:        48px;
+  padding:       0 24px;
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-medium);
+  transition:    var(--transition-hover);
+}
+
+.ds-btn-pill-cta:hover {
+  background: var(--color-primary-dark);
+}
+
+/* Pill CTA secondary variant */
+.ds-btn-pill-cta-outline {
+  background:    transparent;
+  color:         var(--color-primary);
+  border:        1.5px solid var(--color-primary);
+  border-radius: 24px;
+  height:        48px;
+  padding:       0 24px;
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-medium);
+  transition:    var(--transition-hover), var(--transition-border);
+}
+
+.ds-btn-pill-cta-outline:hover {
+  background: var(--color-primary-pastel);
+}
+
+/* Icon-only button (small) */
+.ds-btn-icon {
+  width:           36px;
+  height:          36px;
+  padding:         0;
+  border-radius:   var(--radius-button);
+  background:      transparent;
+  color:           var(--color-text-secondary);
+  border:          none;
+  cursor:          pointer;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  transition:      var(--transition-hover);
+}
+
+.ds-btn-icon:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+
+/* ============================================================
+   § 7  STATUS BADGES
+   ============================================================ */
+
+/* Shared badge base */
+.ds-badge {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            4px;
+  border-radius:  var(--radius-pill);
+  padding:        2px 10px;
+  font-size:      var(--font-size-label);
+  font-weight:    var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  white-space:    nowrap;
+  line-height:    1.6;
+}
+
+.ds-badge-pending {
+  background: var(--color-amber-pastel);
+  color:      var(--color-amber);
+}
+
+.ds-badge-assigned {
+  background: var(--color-primary-pastel);
+  color:      var(--color-primary);
+}
+
+.ds-badge-resolved {
+  background: var(--color-teal-pastel);
+  color:      var(--color-teal);
+}
+
+.ds-badge-archived {
+  background: var(--color-bg-archived);
+  color:      var(--color-text-archived);
+}
+
+/* Error / Critical badge */
+.ds-badge-critical {
+  background: var(--color-error-pastel);
+  color:      var(--color-error);
+}
+
+
+/* ============================================================
+   § 8  PRIORITY INDICATORS
+   ============================================================ */
+
+/* Priority dot (8px circle) — used before list row titles */
+.ds-priority-dot {
+  display:       inline-block;
+  width:         8px;
+  height:        8px;
+  border-radius: 50%;
+  flex-shrink:   0;
+}
+
+.ds-priority-dot-high   { background: var(--color-priority-high); }
+.ds-priority-dot-medium { background: var(--color-priority-medium); }
+.ds-priority-dot-low    { background: var(--color-priority-low); }
+
+/* Priority text labels (no background fill, just colored text) */
+.ds-priority-high   { color: var(--color-priority-high); }
+.ds-priority-medium { color: var(--color-priority-medium); }
+.ds-priority-low    { color: var(--color-priority-low); }
+
+
+/* ============================================================
+   § 9  DEPARTMENT CHIPS
+   ============================================================ */
+
+.ds-chip {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            4px;
+  border-radius:  var(--radius-chip);
+  border:         1px solid var(--color-chip-border);
+  background:     transparent;
+  color:          var(--color-text-secondary);
+  padding:        4px 10px;
+  font-size:      var(--font-size-label);
+  font-weight:    var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  white-space:    nowrap;
+  line-height:    1.5;
+}
+
+/* Active / selected chip variant */
+.ds-chip-active {
+  background: var(--color-primary-pastel);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+
+/* ============================================================
+   § 10  FORM INPUTS
+   ============================================================ */
+
+/* Outlined text input */
+.ds-input {
+  width:         100%;
+  height:        48px;
+  padding:       0 16px;
+  font-family:   var(--font-family);
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-normal);
+  color:         var(--color-text-primary);
+  background:    var(--color-bg-surface);
+  border:        1px solid var(--color-input-border);
+  border-radius: var(--radius-input);
+  outline:       none;
+  transition:    border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.ds-input:focus {
+  border-color: var(--color-input-focus);
+  border-width:  2px;
+  box-shadow:    0 0 0 3px rgba(26, 63, 111, 0.10);
+}
+
+.ds-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+/* Error state */
+.ds-input-error {
+  border-color: var(--color-error);
+}
+
+.ds-input-error:focus {
+  border-color: var(--color-error);
+  box-shadow:   0 0 0 3px rgba(217, 48, 37, 0.10);
+}
+
+.ds-input-error-text {
+  margin-top:  4px;
+  font-size:   var(--font-size-label);
+  font-weight: var(--font-weight-normal);
+  color:       var(--color-error);
+}
+
+/* Textarea variant */
+.ds-textarea {
+  width:         100%;
+  padding:       12px 16px;
+  font-family:   var(--font-family);
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-normal);
+  color:         var(--color-text-primary);
+  background:    var(--color-bg-surface);
+  border:        1px solid var(--color-input-border);
+  border-radius: var(--radius-input);
+  outline:       none;
+  resize:        vertical;
+  min-height:    96px;
+  transition:    border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.ds-textarea:focus {
+  border-color: var(--color-input-focus);
+  border-width:  2px;
+  box-shadow:    0 0 0 3px rgba(26, 63, 111, 0.10);
+}
+
+/* Select input */
+.ds-select {
+  width:         100%;
+  height:        48px;
+  padding:       0 16px;
+  font-family:   var(--font-family);
+  font-size:     var(--font-size-body);
+  font-weight:   var(--font-weight-normal);
+  color:         var(--color-text-primary);
+  background:    var(--color-bg-surface);
+  border:        1px solid var(--color-input-border);
+  border-radius: var(--radius-input);
+  outline:       none;
+  cursor:        pointer;
+  appearance:    none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='%235F6368'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 40px;
+  transition:    border-color 150ms ease;
+}
+
+.ds-select:focus {
+  border-color: var(--color-input-focus);
+  border-width:  2px;
+  box-shadow:    0 0 0 3px rgba(26, 63, 111, 0.10);
+}
+
+/* Input label (floating style — positioned above the input) */
+.ds-input-label {
+  display:        block;
+  margin-bottom:  6px;
+  font-size:      var(--font-size-label);
+  font-weight:    var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  color:          var(--color-text-secondary);
+}
+
+/* Search bar variant */
+.ds-search {
+  width:         100%;
+  height:        48px;
+  padding:       0 16px 0 48px;  /* left padding for icon */
+  font-family:   var(--font-family);
+  font-size:     var(--font-size-body);
+  color:         var(--color-text-primary);
+  background:    var(--color-bg-surface);
+  border:        none;
+  border-radius: var(--radius-search);
+  box-shadow:    var(--shadow-search);
+  outline:       none;
+  transition:    box-shadow 150ms ease;
+}
+
+.ds-search:focus {
+  box-shadow: var(--shadow-search), 0 0 0 2px var(--color-primary);
+}
+
+.ds-search-wrapper {
+  position: relative;
+  display:  flex;
+  align-items: center;
+}
+
+.ds-search-icon {
+  position:  absolute;
+  left:      14px;
+  color:     var(--color-text-secondary);
+  pointer-events: none;
+}
+
+
+/* ============================================================
+   § 11  SHADOW UTILITIES (standalone classes)
+   ============================================================ */
+
+.ds-shadow-card   { box-shadow: var(--shadow-card); }
+.ds-shadow-search { box-shadow: var(--shadow-search); }
+.ds-shadow-inset  { box-shadow: var(--shadow-inset); }
+
+
+/* ============================================================
+   § 12  DIVIDER
+   ============================================================ */
+
+.ds-divider {
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  margin: 0;
+}
+
+
+/* ============================================================
+   § 13  TABLE / LIST ROW
+   ============================================================ */
+
+.ds-table {
+  width:           100%;
+  border-collapse: collapse;
+  font-size:       var(--font-size-body);
+}
+
+.ds-table th {
+  font-size:      var(--font-size-label);
+  font-weight:    var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-label);
+  color:          var(--color-text-secondary);
+  text-align:     left;
+  padding:        8px 16px;
+  border-bottom:  1px solid var(--color-divider);
+}
+
+.ds-table td {
+  padding:       12px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  color:         var(--color-text-primary);
+  vertical-align: middle;
+}
+
+.ds-table tr:hover td {
+  background: var(--color-bg-hover);
+  transition: var(--transition-hover);
+}
+
+.ds-table tr:last-child td {
+  border-bottom: none;
+}
+
+
+/* ============================================================
+   § 14  TOAST NOTIFICATION
+   ============================================================ */
+
+.ds-toast-wrapper {
+  position:       fixed;
+  bottom:         24px;
+  left:           50%;
+  transform:      translateX(-50%);
+  z-index:        6000;
+  pointer-events: none;
+}
+
+.ds-toast {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             16px;
+  background:      #202124;
+  color:           #FFFFFF;
+  border-radius:   var(--radius-button);
+  padding:         0 16px;
+  width:           320px;
+  min-height:      48px;
+  font-size:       var(--font-size-body);
+  font-weight:     var(--font-weight-normal);
+  pointer-events:  all;
+  box-shadow:      0 4px 12px rgba(0,0,0,0.20);
+
+  /* Enter animation */
+  animation: ds-toast-in 300ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.ds-toast.ds-toast-exit {
+  animation: ds-toast-out 300ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.ds-toast-close {
+  background:    transparent;
+  border:        none;
+  color:         rgba(255,255,255,0.7);
+  cursor:        pointer;
+  padding:       4px;
+  border-radius: 4px;
+  font-size:     var(--font-size-label);
+  font-family:   var(--font-family);
+  font-weight:   var(--font-weight-medium);
+  flex-shrink:   0;
+  transition:    color 150ms ease;
+}
+
+.ds-toast-close:hover {
+  color: #FFFFFF;
+}
+
+@keyframes ds-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ds-toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
+}
+
+
+/* ============================================================
+   § 15  MODAL / DRAWER
+   ============================================================ */
+
+/* Modal overlay */
+.ds-modal-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0, 0, 0, 0.40);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  z-index:         5000;
+  padding:         16px;
+  animation:       ds-fade-in 200ms ease;
+}
+
+/* Modal panel */
+.ds-modal {
+  background:    var(--color-bg-surface);
+  border-radius: var(--radius-card);
+  box-shadow:    0 8px 32px rgba(0,0,0,0.18);
+  width:         100%;
+  max-width:     520px;
+  max-height:    90vh;
+  overflow-y:    auto;
+  padding:       var(--layout-card-padding);
+  animation:     ds-slide-up 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Bottom sheet drawer (slides up from bottom) */
+.ds-drawer {
+  position:      fixed;
+  bottom:        0;
+  left:          0;
+  right:         0;
+  background:    var(--color-bg-surface);
+  border-radius: var(--radius-drawer) var(--radius-drawer) 0 0;
+  box-shadow:    0 -4px 24px rgba(0,0,0,0.12);
+  z-index:       1001;
+  transform:     translateY(0);
+  transition:    transform 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-drawer-closed {
+  transform: translateY(100%);
+}
+
+@keyframes ds-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ============================================================
+   § 16  PAGE ENTRANCE ANIMATIONS
+   ============================================================ */
+
+/* Apply to page root element for section load animation */
+.ds-page-enter {
+  animation: ds-page-in 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Apply to individual list items for staggered appearance */
+.ds-stagger-item {
+  animation: ds-page-in 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* CSS-driven stagger delay — set --stagger-index on each element */
+.ds-stagger-item:nth-child(1)  { animation-delay:   0ms; }
+.ds-stagger-item:nth-child(2)  { animation-delay:  50ms; }
+.ds-stagger-item:nth-child(3)  { animation-delay: 100ms; }
+.ds-stagger-item:nth-child(4)  { animation-delay: 150ms; }
+.ds-stagger-item:nth-child(5)  { animation-delay: 200ms; }
+.ds-stagger-item:nth-child(6)  { animation-delay: 250ms; }
+.ds-stagger-item:nth-child(7)  { animation-delay: 300ms; }
+.ds-stagger-item:nth-child(8)  { animation-delay: 350ms; }
+.ds-stagger-item:nth-child(9)  { animation-delay: 400ms; }
+.ds-stagger-item:nth-child(10) { animation-delay: 450ms; }
+
+@keyframes ds-page-in {
+  from {
+    opacity:   0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity:   1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+
+/* ============================================================
+   § 17  LOADING SKELETON
+   ============================================================ */
+
+.ds-skeleton {
+  background:    linear-gradient(90deg, #EBEBEB 25%, #F5F5F5 50%, #EBEBEB 75%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-chip);
+  animation:     ds-skeleton-shimmer 1.6s ease infinite;
+}
+
+@keyframes ds-skeleton-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.ds-skeleton-text    { height: 14px; }
+.ds-skeleton-title   { height: 20px; width: 40%; }
+.ds-skeleton-card    { height: 120px; border-radius: var(--radius-card); }
+
+
+/* ============================================================
+   § 18  UTILITY HELPERS
+   ============================================================ */
+
+/* Flex shortcuts */
+.ds-flex          { display: flex; }
+.ds-flex-center   { display: flex; align-items: center; justify-content: center; }
+.ds-flex-between  { display: flex; align-items: center; justify-content: space-between; }
+.ds-flex-gap-sm   { gap: 8px; }
+.ds-flex-gap-md   { gap: 16px; }
+.ds-flex-gap-lg   { gap: 24px; }
+
+/* Card grid */
+.ds-grid-cards {
+  display: grid;
+  gap: var(--layout-card-gap);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Visually hidden (accessible) */
+.ds-sr-only {
+  position: absolute;
+  width:  1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+
+/* ============================================================
+   § 19  REDUCED MOTION OVERRIDE
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:   0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration:  0.01ms !important;
+    scroll-behavior:      auto !important;
+  }
+}
+
+
+/* ============================================================
+   § 20  PRINT STYLES (for Weekly Report)
+   ============================================================ */
+
+@media print {
+  /* Hide navigation, top bars, buttons */
+  aside,
+  header,
+  .ds-btn,
+  .ds-btn-icon,
+  .ds-btn-primary,
+  .ds-btn-secondary,
+  .ds-btn-teal,
+  .ds-btn-danger,
+  .ds-toast-wrapper {
+    display: none !important;
+  }
+
+  /* Expand main content to full page */
+  body {
+    background: #FFFFFF !important;
+    color: #000000;
+    font-size: 12pt;
+  }
+
+  main,
+  .ds-card {
+    box-shadow: none !important;
+    border: 1px solid #E0E0E0;
+    break-inside: avoid;
+  }
+
+  /* Remove max-width constraint for print */
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure links print legibly */
+  a[href]::after {
+    content: none;
+  }
+}
