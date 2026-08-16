@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { formatDateTimeLocal } from "../utils/reports";
 
+function isSafeOptionalUrl(value) {
+  if (!value.trim()) return true;
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export default function ResolutionModal({
   report,
   defaultResolver,
@@ -21,7 +30,8 @@ export default function ResolutionModal({
   const canResolve =
     resolutionNotes.trim() &&
     resolvedBy.trim() &&
-    completionTime;
+    completionTime &&
+    isSafeOptionalUrl(afterImageUrl);
 
   return (
     <div className="ds-modal-overlay">
@@ -46,6 +56,7 @@ export default function ResolutionModal({
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
               rows={4}
+              maxLength={2000}
               placeholder="Describe what was completed."
               className="ds-textarea"
             />
@@ -57,6 +68,7 @@ export default function ResolutionModal({
               value={resolvedBy}
               onChange={(e) => setResolvedBy(e.target.value)}
               placeholder="Resolver name"
+              maxLength={120}
               className="ds-input"
             />
           </div>
@@ -77,8 +89,12 @@ export default function ResolutionModal({
               value={afterImageUrl}
               onChange={(e) => setAfterImageUrl(e.target.value)}
               placeholder="Optional for future upload support"
+              maxLength={2048}
               className="ds-input"
             />
+            {afterImageUrl && !isSafeOptionalUrl(afterImageUrl) && (
+              <p className="ds-input-error-text">Use an http:// or https:// image URL.</p>
+            )}
           </div>
         </div>
 

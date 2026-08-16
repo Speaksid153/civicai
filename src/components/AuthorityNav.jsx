@@ -20,11 +20,12 @@ export default function AuthorityNav({ user, setToast }) {
   const links = [
     { name: "Dashboard", path: "/authority", icon: "dashboard" },
     { name: "History", path: "/authority/history", icon: "history" },
-    { name: "AI Insights", path: "/authority/insights", icon: "lightbulb" },
+    { name: "Operational Insights", path: "/authority/insights", icon: "monitoring" },
     { name: "Weekly Report", path: "/authority/weekly-report", icon: "summarize" },
   ];
 
   return (
+    <>
     <aside style={{
       width: "var(--layout-sidebar-expanded)",
       backgroundColor: "var(--color-bg-surface)",
@@ -115,5 +116,27 @@ export default function AuthorityNav({ user, setToast }) {
         </button>
       </div>
     </aside>
+
+    <nav className="authority-mobile-nav md:hidden" aria-label="Authority navigation">
+      {links.map((link) => {
+        const isActive = location.pathname === link.path || (link.path !== "/authority" && location.pathname.startsWith(link.path));
+        return (
+          <Link
+            key={link.name}
+            to={link.path}
+            aria-label={link.name}
+            className={isActive ? "authority-mobile-link authority-mobile-link-active" : "authority-mobile-link"}
+          >
+            <span className="material-symbols-outlined">{link.icon}</span>
+            <span>{link.name === "Operational Insights" ? "Insights" : link.name}</span>
+          </Link>
+        );
+      })}
+      <button type="button" onClick={handleLogout} className="authority-mobile-link" aria-label="Sign out">
+        <span className="material-symbols-outlined">logout</span>
+        <span>Sign out</span>
+      </button>
+    </nav>
+    </>
   );
 }

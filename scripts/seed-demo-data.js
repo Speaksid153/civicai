@@ -8,8 +8,9 @@
  *   node scripts/seed-demo-data.js
  *
  * Options:
- *   --clear   Delete all existing reports before seeding
+ *   --clear --confirm-project=<id>   Delete all existing reports before seeding
  *   --dry-run Print reports to console without writing to Firestore
+ *   --allow-live --confirm-project=<id> Permit live writes to the named project
  *
  * Requirements:
  *   - Firebase credentials in .env (VITE_FIREBASE_* keys)
@@ -60,6 +61,12 @@ const db  = getFirestore(app);
 const args    = process.argv.slice(2);
 const CLEAR   = args.includes("--clear");
 const DRY_RUN = args.includes("--dry-run");
+const ALLOW_LIVE = args.includes("--allow-live");
+const CONFIRMED_PROJECT = args.find((arg) => arg.startsWith("--confirm-project="))?.split("=")[1];
+
+if (!DRY_RUN && (!ALLOW_LIVE || CONFIRMED_PROJECT !== env.VITE_FIREBASE_PROJECT_ID)) {
+  throw new Error(`Refusing live Firestore access. Use --allow-live --confirm-project=${env.VITE_FIREBASE_PROJECT_ID}`);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function randomBetween(min, max) {
@@ -210,7 +217,7 @@ const DESCRIPTIONS = {
   ],
 };
 
-const AI_SUMMARIES = {
+const ROUTING_SUMMARIES = {
   Road: [
     "Road surface damage reported near key thoroughfare. Pothole poses risk to two-wheelers and pedestrians. Immediate patching recommended.",
     "Significant road deterioration documented. Evidence suggests prolonged neglect. Priority repair required before next rainfall cycle.",
@@ -361,20 +368,20 @@ function generateReport() {
   const createdAt = timestampDaysAgo(daysAgo);
 
   const description = pick(DESCRIPTIONS[category]);
-  const aiSummary   = pick(AI_SUMMARIES[category]);
+  const routingSummary = pick(ROUTING_SUMMARIES[category]);
 
-  const ai = {
+  const analysis = {
     category,
     department:          dept,
     priority,
-    summary:             aiSummary,
+    summary:             routingSummary,
     confidence:          randomInt(72, 98),
     priorityExplanation: `Issue assessed as ${priority} priority based on public safety impact and report frequency in this area.`,
     visibleHazards:      generateHazards(category, priority),
     userEdited:          Math.random() < 0.15,
     editReason:          Math.random() < 0.15
-      ? "User reviewed and adjusted AI analysis"
-      : "User accepted AI analysis",
+      ? "User adjusted automated routing"
+      : "User accepted automated routing",
   };
 
   const report = {
@@ -393,7 +400,7 @@ function generateReport() {
     afterImageUrl:      "",
     resolvedAt:         null,
     archivedAt:         null,
-    ai,
+    analysis,
     createdAt,
   };
 
@@ -455,7 +462,7 @@ function generateDuplicates() {
       afterImageUrl:      "",
       resolvedAt:         null,
       archivedAt:         null,
-      ai: {
+      analysis: {
         category:            "Road",
         department:          "BBMP Roads",
         priority:            "High",
@@ -464,7 +471,7 @@ function generateDuplicates() {
         priorityExplanation: "High-traffic location with multiple active accident reports this week.",
         visibleHazards:      ["pothole", "traffic_risk"],
         userEdited:          false,
-        editReason:          "User accepted AI analysis",
+        editReason:          "User accepted automated routing",
       },
       createdAt,
     };

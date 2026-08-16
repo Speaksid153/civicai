@@ -7,13 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test",
     "preview": "vite preview",
-    "seed": "node scripts/seed-demo-data.js",
-    "seed:clear": "node scripts/seed-demo-data.js --clear",
-    "seed:dry": "node scripts/seed-demo-data.js --dry-run"
+    "seed": "node scripts/seed-demo-data.js --dry-run"
   },
   "dependencies": {
-    "@google/genai": "^2.10.0",
     "firebase": "^12.15.0",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",

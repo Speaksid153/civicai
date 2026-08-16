@@ -1,57 +1,22 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { loginUser, registerUser } from "../services/auth";
+import { sendAuthoritySignInLink } from "../services/auth";
 
-export default function AuthorityLogin({ onLogin }) {
+export default function AuthorityLogin() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
-
-  async function handleLogin() {
-    if (!email || !password) {
-      setError("Please fill all fields.");
-      return;
-    }
-
+  async function handleLogin(event) {
+    event.preventDefault();
     try {
       setLoading(true);
       setError("");
-
-      await loginUser(email, password);
-
-      if (onLogin) {
-        onLogin();
-      }
-
+      await sendAuthoritySignInLink(email);
+      setSent(true);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Development only
-  async function handleRegister() {
-    if (!email || !password) {
-      setError("Please fill all fields.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      await registerUser(email, password);
-
-      alert("Authority account created successfully.");
-
-    } catch (err) {
-      setError(err.message);
+      setError(err.message || "The secure sign-in link could not be sent. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -77,96 +42,59 @@ export default function AuthorityLogin({ onLogin }) {
         
         <hr className="ds-divider" style={{ marginBottom: "24px" }} />
 
-        {/* Login Form */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          
-          <div>
-            <label className="ds-input-label">Email address</label>
-            <div style={{ position: "relative", marginTop: "4px" }}>
-              <span className="material-symbols-outlined" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-text-secondary)", pointerEvents: "none" }}>mail</span>
-              <input
-                type="email"
-                className={`ds-input ${error ? 'ds-input-error' : ''}`}
-                style={{ paddingLeft: "44px" }}
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError("");
-                }}
-              />
-            </div>
-          </div>
+        {/* Login */}
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <p className="ds-body ds-secondary" style={{ textAlign: "center", margin: 0 }}>
+            Enter the registered authority email. We will send a one-time secure sign-in link—no password or popup required.
+          </p>
 
-          <div>
-            <label className="ds-input-label">Password</label>
-            <div style={{ position: "relative", marginTop: "4px" }}>
-              <span className="material-symbols-outlined" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-text-secondary)", pointerEvents: "none" }}>lock</span>
-              <input
-                type={showPassword ? "text" : "password"}
-                className={`ds-input ${error ? 'ds-input-error' : ''}`}
-                style={{ paddingLeft: "44px", paddingRight: "44px" }}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleLogin();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="ds-btn-icon"
-                style={{ position: "absolute", right: "4px", top: "50%", transform: "translateY(-50%)", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>
-                  {showPassword ? "visibility_off" : "visibility"}
-                </span>
-              </button>
-            </div>
-            {error && (
-              <p className="ds-input-error-text" style={{ marginTop: "8px", fontSize: "12px" }}>
-                {error}
-              </p>
-            )}
-          </div>
+          <label className="ds-label" htmlFor="authority-email">Authority email</label>
+          <input
+            id="authority-email"
+            type="email"
+            value={email}
+            onChange={(event) => { setEmail(event.target.value); setSent(false); }}
+            autoComplete="email"
+            required
+            className="ds-input"
+            placeholder="name@municipality.gov"
+          />
 
           <button
-            onClick={handleLogin}
             disabled={loading}
+            type="submit"
             className="ds-btn ds-btn-primary"
-            style={{ width: "100%", height: "48px", marginTop: "12px" }}
+            style={{ width: "100%", height: "48px", marginTop: "4px" }}
           >
             {loading ? (
               <span className="material-symbols-outlined" style={{ animation: "ds-skeleton-shimmer 1.5s infinite" }}>sync</span>
             ) : (
-              "Sign in"
+              "Email me a secure sign-in link"
             )}
           </button>
+
+          {sent && (
+            <p role="status" style={{ margin: 0, fontSize: "13px", textAlign: "center", color: "var(--color-success, #137333)" }}>
+              Link sent. Open the email on this device to finish signing in.
+            </p>
+          )}
+
+          {error && (
+            <p className="ds-input-error-text" role="alert" style={{ margin: 0, fontSize: "12px", textAlign: "center" }}>
+              {error}
+            </p>
+          )}
 
           <p style={{ textAlign: "center", fontSize: "14px", color: "var(--color-text-secondary)", marginTop: "16px", marginBottom: "0" }}>
             For citizens, use the <Link to="/" style={{ color: "var(--color-primary)", fontWeight: "500", textDecoration: "none" }}>public portal &rarr;</Link>
           </p>
 
-          <button
-            onClick={handleRegister}
-            disabled={loading}
-            className="ds-btn"
-            style={{ width: "100%", background: "transparent", border: "none", color: "var(--color-text-secondary)", fontSize: "12px", marginTop: "8px", textDecoration: "underline", padding: 0 }}
-          >
-            Register Authority (Development)
-          </button>
-
-        </div>
+        </form>
       </div>
 
       {/* Footer */}
       <p style={{ fontSize: "12px", color: "#5F6368", marginTop: "32px", textAlign: "center" }}>
-        CivicAI &mdash; Built for Google AI Hackathon
+        CivicAI &mdash; Municipal operations portal
       </p>
 
     </div>

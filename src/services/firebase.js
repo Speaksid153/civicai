@@ -1,18 +1,17 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage";
-
 import {
-  getFirestore,
   collection,
-  addDoc,
-  getDocs,
-  query,
-  orderBy,
-  where,
-  updateDoc,
   doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
+  where,
+  writeBatch,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -24,35 +23,82 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Firebase
-export const app = initializeApp(firebaseConfig);
+const requiredConfig = ["apiKey", "authDomain", "projectId", "appId"];
+export const isFirebaseConfigured = requiredConfig.every((key) => Boolean(firebaseConfig[key]));
+const validCategories = new Set(["Road", "Garbage", "Water", "Electricity", "Drainage", "Other"]);
+const validPriorities = new Set(["Low", "Medium", "High", "Critical"]);
 
-// Firestore
-export const db = getFirestore(app);
+export const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const db = app ? getFirestore(app) : null;
+export const auth = app ? getAuth(app) : null;
 
-// Authentication
-export const auth = getAuth(app);
+function requireDatabase() {
+  if (!db) {
+    throw new Error("Civic data service is not configured. Add the Firebase web configuration to the deployment environment.");
+  }
+  return db;
+}
 
-// Storage
-export const storage = getStorage(app);
+function mapSnapshot(snapshot) {
+  return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }));
+}
 
+function safePublicLocation(location) {
+  if (!location || !Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) return null;
+  return {
+    latitude: Math.round(location.latitude * 1000) / 1000,
+    longitude: Math.round(location.longitude * 1000) / 1000,
+  };
+}
 
-// ==============================
-// CREATE REPORT
-// ==============================
+function timestampMillis(value) {
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  const date = value instanceof Date ? value : new Date(value || 0);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function newestFirst(reports) {
+  return reports.sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
+}
 
 export async function addReport(data) {
-  const aiAnalysis = {
-    category: "",
-    department: "",
-    priority: "",
-    summary: "",
-    confidence: 0,
-    ...(data.ai ?? {}),
-  };
+  const database = requireDatabase();
+  const description = String(data.description || "").trim();
+  if (description.length < 10 || description.length > 2000) {
+    throw new Error("Report descriptions must contain between 10 and 2,000 characters.");
+  }
+  if (!Number.isFinite(data.location?.latitude) || !Number.isFinite(data.location?.longitude)) {
+    throw new Error("A valid report location is required.");
+  }
 
-  const docRef = await addDoc(collection(db, "reports"), {
+  const reportRef = doc(collection(database, "reports"));
+  const publicRef = doc(database, "publicReports", reportRef.id);
+  const createdAt = serverTimestamp();
+  const analysis = {
+    category: "Other",
+    department: "BBMP Sanitation",
+    priority: "Medium",
+    summary: "Report submitted for authority review.",
+    confidence: 0,
+    ...(data.analysis ?? {}),
+  };
+  const category = validCategories.has(data.category) ? data.category : "Other";
+  const priority = validPriorities.has(data.priority) ? data.priority : "Medium";
+  analysis.category = category;
+  analysis.priority = priority;
+  analysis.summary = String(analysis.summary || "Report submitted for authority review.").slice(0, 500);
+  analysis.matchSignals = Array.isArray(analysis.matchSignals) ? analysis.matchSignals.slice(0, 24) : [];
+  analysis.duplicates = Array.isArray(analysis.duplicates) ? analysis.duplicates.slice(0, 3) : [];
+  analysis.visibleHazards = Array.isArray(analysis.visibleHazards) ? analysis.visibleHazards.slice(0, 8) : [];
+  analysis.urgencyIndicators = Array.isArray(analysis.urgencyIndicators) ? analysis.urgencyIndicators.slice(0, 8) : [];
+
+  const privateReport = {
     ...data,
+    description,
+    category,
+    analysis,
+    imageUrl: null,
     status: "pending",
     assignedDepartment: "",
     assignedOfficer: "",
@@ -63,100 +109,71 @@ export async function addReport(data) {
     afterImageUrl: "",
     resolvedAt: null,
     archivedAt: null,
-    priority: data.priority ?? aiAnalysis.priority ?? "",
-    ai: aiAnalysis,
-    createdAt: serverTimestamp(),
-  });
+    priority,
+    createdAt,
+  };
 
-  return docRef.id;
+  const publicReport = {
+    category,
+    status: "pending",
+    priority,
+    location: safePublicLocation(data.location),
+    matchSignals: Array.isArray(analysis.matchSignals) ? analysis.matchSignals.slice(0, 24) : [],
+    createdAt,
+  };
+
+  const batch = writeBatch(database);
+  batch.set(reportRef, privateReport);
+  batch.set(publicRef, publicReport);
+  await batch.commit();
+  return reportRef.id;
 }
-
-// ==============================
-// GET REPORTS
-// ==============================
 
 export async function getReports() {
-  const q = query(collection(db, "reports"), orderBy("createdAt", "desc"));
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  const database = requireDatabase();
+  const snapshot = await getDocs(query(collection(database, "reports"), orderBy("createdAt", "desc")));
+  return mapSnapshot(snapshot);
 }
 
-// ==============================
-// PENDING
-// ==============================
+export async function getPublicReports(maxResults = 100) {
+  if (!db) return [];
+  const snapshot = await getDocs(query(collection(db, "publicReports"), orderBy("createdAt", "desc"), limit(maxResults)));
+  return mapSnapshot(snapshot);
+}
+
+export async function getRecentPublicReports(since, maxResults = 30) {
+  if (!db) return [];
+  const snapshot = await getDocs(query(
+    collection(db, "publicReports"),
+    where("createdAt", ">=", since),
+    orderBy("createdAt", "desc"),
+    limit(maxResults),
+  ));
+  return mapSnapshot(snapshot);
+}
 
 export async function getPendingReports() {
-  const q = query(
-    collection(db, "reports"),
+  const database = requireDatabase();
+  const snapshot = await getDocs(query(
+    collection(database, "reports"),
     where("status", "==", "pending"),
-    orderBy("createdAt", "desc")
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  ));
+  return newestFirst(mapSnapshot(snapshot));
 }
-
-// ==============================
-// ARCHIVED
-// ==============================
 
 export async function getArchivedReports() {
-  try {
-    // Primary query: status == "archived"
-    const q1 = query(
-      collection(db, "reports"),
-      where("status", "==", "archived"),
-      orderBy("createdAt", "desc")
-    );
-    const snapshot1 = await getDocs(q1);
-    const reports1 = snapshot1.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    // Fallback: reports with archivedAt set (in case status field missing)
-    const q2 = query(
-      collection(db, "reports"),
-      where("archivedAt", "!=", null)
-    );
-    const snapshot2 = await getDocs(q2);
-    const reports2 = snapshot2.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    // Merge and deduplicate by id (prefer status archived if duplicate)
-    const mergedMap = new Map();
-    reports2.forEach((r) => mergedMap.set(r.id, r));
-    reports1.forEach((r) => mergedMap.set(r.id, r)); // overwrite with status archived version
-    
-    // Sort manually since we removed orderBy from q2 to avoid composite index requirement
-    return Array.from(mergedMap.values()).sort((a, b) => {
-      const timeA = a.createdAt?.toMillis?.() || 0;
-      const timeB = b.createdAt?.toMillis?.() || 0;
-      return timeB - timeA;
-    });
-  } catch (error) {
-    console.error("Error fetching archived reports:", error);
-    throw error;
-  }
+  const database = requireDatabase();
+  const snapshot = await getDocs(query(
+    collection(database, "reports"),
+    where("status", "==", "archived"),
+  ));
+  return newestFirst(mapSnapshot(snapshot));
 }
 
-// ==============================
-// ASSIGN
-// ==============================
-
 export async function assignReport(id, assignment) {
-  await updateDoc(doc(db, "reports", id), {
+  const database = requireDatabase();
+  const batch = writeBatch(database);
+  batch.update(doc(database, "reports", id), {
     status: "assigned",
     assignedDepartment: assignment.department,
     assignedOfficer: assignment.officer,
@@ -164,41 +181,46 @@ export async function assignReport(id, assignment) {
     assignedBy: assignment.assignedBy,
     assignedAt: serverTimestamp(),
   });
+  batch.set(doc(database, "publicReports", id), { status: "assigned", priority: assignment.priority }, { merge: true });
+  await batch.commit();
 }
 
-// ==============================
-// RESOLVE
-// ==============================
-
 export async function resolveReport(id, resolution) {
+  const database = requireDatabase();
   const resolvedAt = resolution.resolvedAt || serverTimestamp();
-
-  await updateDoc(doc(db, "reports", id), {
+  const batch = writeBatch(database);
+  batch.update(doc(database, "reports", id), {
     status: "resolved",
     resolvedBy: resolution.resolvedBy,
     resolutionNotes: resolution.resolutionNotes,
     afterImageUrl: resolution.afterImageUrl,
     resolvedAt,
   });
+  batch.set(doc(database, "publicReports", id), { status: "resolved" }, { merge: true });
+  await batch.commit();
 }
 
-// ==============================
-// ARCHIVE
-// ==============================
-
 export async function archiveReport(id) {
-  await updateDoc(doc(db, "reports", id), {
+  const database = requireDatabase();
+  const batch = writeBatch(database);
+  batch.update(doc(database, "reports", id), {
     status: "archived",
     archivedAt: serverTimestamp(),
   });
+  batch.set(doc(database, "publicReports", id), { status: "archived" }, { merge: true });
+  await batch.commit();
 }
 
-// ==============================
-// SIMPLE STATUS UPDATE
-// ==============================
-
 export async function updateReportStatus(id, status) {
-  await updateDoc(doc(db, "reports", id), {
-    status,
-  });
+  const database = requireDatabase();
+  const batch = writeBatch(database);
+  batch.update(doc(database, "reports", id), { status });
+  batch.set(doc(database, "publicReports", id), { status }, { merge: true });
+  await batch.commit();
+}
+
+export async function getAuthorityProfile(uid) {
+  if (!db || !uid) return null;
+  const snapshot = await getDoc(doc(db, "authorities", uid));
+  return snapshot.exists() ? snapshot.data() : null;
 }

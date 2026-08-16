@@ -5,12 +5,11 @@ export default function AssignModal({
   onClose,
   onAssign,
 }) {
-  const [department, setDepartment] = useState(
-    report?.ai?.department || ""
-  );
+  const analysis = report?.analysis || report?.ai;
+  const [department, setDepartment] = useState(analysis?.department || "BBMP Roads");
   const [officer, setOfficer] = useState("");
   const [priority, setPriority] = useState(
-    report?.ai?.priority || "Medium"
+    analysis?.priority || "Medium"
   );
 
   if (!report) return null;
@@ -23,14 +22,14 @@ export default function AssignModal({
           <h2 className="ds-title" style={{ margin: 0 }}>Assign Report</h2>
         </div>
         <p className="ds-body ds-secondary" style={{ marginBottom: "24px" }}>
-          AI has already suggested a department and priority. Review them before assigning.
+          The local rules engine suggested a department and priority. Review them before assigning.
         </p>
 
-        {report.ai && (
+        {analysis && (
           <div className="ds-card-inset" style={{ backgroundColor: "var(--color-primary-pastel)", border: "none", marginBottom: "24px", padding: "16px" }}>
-            <h3 className="ds-label" style={{ color: "var(--color-primary)", marginBottom: "8px" }}>AI RECOMMENDATION</h3>
-            <p className="ds-body" style={{ margin: "0 0 8px 0" }}><strong>Summary:</strong> {report.ai.summary}</p>
-            <p className="ds-body" style={{ margin: 0 }}><strong>Confidence:</strong> {report.ai.confidence}%</p>
+            <h3 className="ds-label" style={{ color: "var(--color-primary)", marginBottom: "8px" }}>ROUTING RECOMMENDATION</h3>
+            <p className="ds-body" style={{ margin: "0 0 8px 0" }}><strong>Summary:</strong> {analysis.summary}</p>
+            <p className="ds-body" style={{ margin: 0 }}><strong>Rule match:</strong> {analysis.confidence}%</p>
           </div>
         )}
 
@@ -48,7 +47,7 @@ export default function AssignModal({
 
           <div>
             <label className="ds-input-label">Officer Name</label>
-            <input value={officer} onChange={(e) => setOfficer(e.target.value)} placeholder="Officer Name" className="ds-input" />
+            <input value={officer} onChange={(e) => setOfficer(e.target.value)} maxLength={120} placeholder="Officer Name" className="ds-input" />
           </div>
 
           <div>

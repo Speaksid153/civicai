@@ -178,8 +178,8 @@ export default function AuthorityDashboard() {
       const haystack = [
         report.description,
         report.category,
-        report.ai?.category,
-        report.ai?.department,
+        report.analysis?.category || report.ai?.category,
+        report.analysis?.department || report.ai?.department,
         report.assignedDepartment,
         report.assignedOfficer,
         report.priority,
@@ -194,7 +194,7 @@ export default function AuthorityDashboard() {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--color-bg-app)" }}>
+    <div className="authority-shell" style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--color-bg-app)" }}>
       
       {/* Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -220,9 +220,6 @@ export default function AuthorityDashboard() {
           
           {/* Right: Notifications & Profile */}
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button className="ds-btn-icon" aria-label="Notifications">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
             {user && (
               <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "var(--color-primary-pastel)", color: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
                 {user.email.charAt(0).toUpperCase()}

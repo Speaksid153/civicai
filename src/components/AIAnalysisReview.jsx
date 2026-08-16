@@ -19,13 +19,15 @@ const AIAnalysisReview = ({
 
     try {
       // Determine if user actually edited anything
-      const userEdited = editedCategory !== aiAnalysis.category || editedPriority !== aiAnalysis.priority;
-      const editReason = userEdited ? "User reviewed and adjusted AI analysis" : "User accepted AI analysis";
+      const finalCategory = editedCategory || aiAnalysis.category;
+      const finalPriority = editedPriority || aiAnalysis.priority;
+      const userEdited = finalCategory !== aiAnalysis.category || finalPriority !== aiAnalysis.priority;
+      const editReason = userEdited ? "User adjusted automated routing" : "User accepted automated routing";
 
       await onSubmit({
         ...aiAnalysis,
-        category: editedCategory || aiAnalysis.category,
-        priority: editedPriority || aiAnalysis.priority,
+        category: finalCategory,
+        priority: finalPriority,
         userEdited,
         editReason
       });
@@ -40,7 +42,7 @@ const AIAnalysisReview = ({
   // Handle edit toggle
   const handleEditToggle = () => {
     if (!isEditing) {
-      // When entering edit mode, initialize from AI values
+      // When entering edit mode, initialize from the rule-engine values
       setEditedCategory(aiAnalysis.category || "");
       setEditedPriority(aiAnalysis.priority || "");
     }
@@ -55,7 +57,7 @@ const AIAnalysisReview = ({
           auto_awesome
         </span>
         <h3 className="ds-title">
-          Gemini AI Analysis
+          Automated Civic Assessment
         </h3>
         <p className="ds-body ds-secondary">
           Review the automated assessment of your submission.
@@ -88,18 +90,18 @@ const AIAnalysisReview = ({
       {/* Bento Grid of Findings */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
         
-        {/* AI Confidence */}
+        {/* Rule confidence */}
         <div className="ds-card">
           <div className="ds-flex-center" style={{ gap: "8px", marginBottom: "8px" }}>
             <span className="material-symbols-outlined ds-secondary" style={{ fontSize: "18px" }}>psychology</span>
-            <span className="ds-label ds-secondary">AI CONFIDENCE</span>
+            <span className="ds-label ds-secondary">RULE MATCH CONFIDENCE</span>
           </div>
           <div className="ds-flex-between" style={{ alignItems: "baseline" }}>
             <span style={{ fontSize: "24px", fontWeight: "var(--font-weight-bold)", color: "var(--color-text-primary)" }}>
               {aiAnalysis.confidence}%
             </span>
             <span className="ds-badge ds-badge-resolved">
-              High Confidence
+              {aiAnalysis.confidence >= 75 ? "Strong match" : aiAnalysis.confidence >= 50 ? "Review advised" : "Low match"}
             </span>
           </div>
         </div>
@@ -166,10 +168,10 @@ const AIAnalysisReview = ({
       {/* Audit Section */}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <h3 className="ds-title" style={{ textAlign: "center" }}>
-          Do you accept this analysis?
+          Does this routing look correct?
         </h3>
         <p className="ds-body ds-secondary" style={{ textAlign: "center", maxWidth: "400px", margin: "0 auto" }}>
-          Confirming this data ensures it reaches the correct department quickly. You can adjust the details if the AI missed something.
+          This suggestion comes from transparent local rules. Adjust it whenever the category or urgency does not match the real situation.
         </p>
         
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>

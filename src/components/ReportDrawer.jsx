@@ -1,15 +1,7 @@
 import { useState } from "react";
 import AIAnalysisReview from "./AIAnalysisReview";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-} from "firebase/firestore";
-import { db, addReport } from "../services/firebase";
-import { analyzeAndCheckDuplicates } from "../services/ai";
+import { addReport, getRecentPublicReports } from "../services/firebase";
+import { analyzeReport } from "../services/civicIntelligence";
 
 export default function ReportDrawer({
   drawerOpen,
@@ -23,15 +15,34 @@ export default function ReportDrawer({
   locationStatus,
   onSubmitSuccess,
 }) {
+  const departmentByCategory = {
+    Road: "BBMP Roads",
+    Garbage: "BBMP Sanitation",
+    Water: "BWSSB",
+    Electricity: "BESCOM",
+    Drainage: "BWSSB",
+    Other: "BBMP Sanitation",
+  };
+  const applyCategoryChoice = (analysis) => category
+    ? { ...analysis, category, department: departmentByCategory[category], recommendedDepartment: departmentByCategory[category] }
+    : analysis;
   const [duplicateCheckRunning, setDuplicateCheckRunning] = useState(false);
   const [submitRunning, setSubmitRunning] = useState(false); // New state for submission
   const [potentialDuplicates, setPotentialDuplicates] = useState([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [checkedForDuplicates, setCheckedForDuplicates] = useState(false);
+  const [analysisFingerprint, setAnalysisFingerprint] = useState("");
 
-  // AI Analysis Review state
+  // Automated routing review state
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [showAiReview, setShowAiReview] = useState(false);
+
+  const currentFingerprint = () => JSON.stringify([
+    description.trim(),
+    category,
+    location?.latitude,
+    location?.longitude,
+  ]);
 
   // Check for potential duplicate reports nearby
   const checkForDuplicates = async () => {
@@ -45,19 +56,7 @@ export default function ReportDrawer({
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      // Query for recent reports
-      const q = query(
-        collection(db, "reports"),
-        where("createdAt", ">=", sevenDaysAgo),
-        orderBy("createdAt", "desc"),
-        limit(30) // Limit for performance
-      );
-
-      const querySnapshot = await getDocs(q);
-      const recentReports = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const recentReports = await getRecentPublicReports(sevenDaysAgo, 30);
 
       // Filter reports that are nearby (approximately 1km radius)
       const nearbyReports = recentReports.filter((report) => {
@@ -65,8 +64,9 @@ export default function ReportDrawer({
 
         const lat1 = location.latitude;
         const lon1 = location.longitude;
-        const lat2 = report.location.latitude;
-        const lon2 = report.location.longitude;
+        const lat2 = report.location.latitude ?? report.location.lat;
+        const lon2 = report.location.longitude ?? report.location.lng;
+        if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return false;
 
         // Haversine formula approximation for distance in kilometers
         const R = 6371; // Earth's radius in km
@@ -84,23 +84,29 @@ export default function ReportDrawer({
       });
 
       if (description.trim().length > 10) {
-        // Use single Gemini call for both duplicates and classification
-        const aiResponse = await analyzeAndCheckDuplicates(
-          description,
-          nearbyReports
-        );
-        setPotentialDuplicates(aiResponse.duplicates || []);
-        setShowDuplicateWarning(aiResponse.isLikelyDuplicate || false);
-        setAiAnalysis(aiResponse); // Save analysis for next step
+        const analysis = applyCategoryChoice(analyzeReport(description, nearbyReports));
+        setPotentialDuplicates(analysis.duplicates || []);
+        setShowDuplicateWarning(analysis.isLikelyDuplicate || false);
+        setAiAnalysis(analysis);
+        setAnalysisFingerprint(currentFingerprint());
+        return analysis;
       } else {
+        const analysis = applyCategoryChoice(analyzeReport(description, []));
         setPotentialDuplicates([]);
         setShowDuplicateWarning(false);
+        setAiAnalysis(analysis);
+        setAnalysisFingerprint(currentFingerprint());
+        return analysis;
       }
     } catch (err) {
       console.error("Error checking for duplicates:", err);
       // Continue with submission even if duplicate check fails
       setPotentialDuplicates([]);
       setShowDuplicateWarning(false);
+      const analysis = applyCategoryChoice(analyzeReport(description, []));
+      setAiAnalysis(analysis);
+      setAnalysisFingerprint(currentFingerprint());
+      return analysis;
     } finally {
       setDuplicateCheckRunning(false);
     }
@@ -108,13 +114,19 @@ export default function ReportDrawer({
 
 
 
-  // Handle form submission with duplicate check, image upload, and AI analysis
+  // Handle form submission with local duplicate and routing checks
   const handleDuplicatedSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
 
     // Basic validation
-    if (!description.trim()) {
-      alert("Please describe the issue");
+    const cleanDescription = description.trim();
+    if (cleanDescription.length < 10) {
+      alert("Please describe the issue in at least 10 characters");
+      return;
+    }
+
+    if (cleanDescription.length > 2000) {
+      alert("Please keep the description under 2,000 characters");
       return;
     }
 
@@ -123,39 +135,24 @@ export default function ReportDrawer({
       return;
     }
 
-    // If we haven't checked for duplicates yet, do it now
-    if (!checkedForDuplicates) {
-      await checkForDuplicates();
-      // Removed the 1-second wait hack - after await, duplicateCheckRunning is false
+    let analysis = aiAnalysis;
+    if (!checkedForDuplicates || analysisFingerprint !== currentFingerprint()) {
+      analysis = await checkForDuplicates();
     }
 
-    // If duplicates found and user hasn't overridden, show warning
-    if (showDuplicateWarning && potentialDuplicates.length > 0) {
-      // Show confirmation dialog
-      if (
-        !window.confirm(
-          `Similar reports found nearby. ${potentialDuplicates[0].suggestion}\n\nSubmit anyway?`
-        )
-      ) {
-        return;
-      }
+    if (analysis?.isLikelyDuplicate && analysis.duplicates?.length > 0) {
+      setShowDuplicateWarning(true);
+      return;
     }
 
-    // Reset duplicate check state for next submission
-    setCheckedForDuplicates(false);
     setShowDuplicateWarning(false);
 
     try {
-      // Set submission state
       setSubmitRunning(true);
-
-      // We already fetched AI analysis during checkForDuplicates!
-      // If by some edge case we didn't (e.g., short description), fetch it now
-      if (!aiAnalysis) {
-        const aiResponse = await analyzeAndCheckDuplicates(description, []);
-        setAiAnalysis(aiResponse);
+      if (!analysis) {
+        analysis = applyCategoryChoice(analyzeReport(description, []));
+        setAiAnalysis(analysis);
       }
-
       setShowAiReview(true);
     } catch (error) {
       console.error("Error submitting report:", error);
@@ -165,31 +162,33 @@ export default function ReportDrawer({
     }
   };
 
-  // Handle submission from AI analysis review
+  // Handle submission from the automated analysis review
   const handleAiReviewSubmit = async (reviewedAnalysis) => {
     try {
       setSubmitRunning(true);
+      const reviewedDepartment = departmentByCategory[reviewedAnalysis.category] || "BBMP Sanitation";
 
-      // Prepare report data with both AI suggestion and final decision
       const reportData = {
-        description,
-        category: reviewedAnalysis.category, // What user ultimately selected
+        description: description.trim(),
+        category: reviewedAnalysis.category,
+        priority: reviewedAnalysis.priority,
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
         },
         imageUrl: null,
-        // Store both AI suggestion and final decision for audit trail
-        ai: {
-          ...aiAnalysis, // Original AI suggestion
-          finalCategory: reviewedAnalysis.category, // What was actually submitted
+        analysis: {
+          ...aiAnalysis,
+          finalCategory: reviewedAnalysis.category,
           finalPriority: reviewedAnalysis.priority,
-          userOverride: reviewedAnalysis.userEdited, // Whether user overrode AI
-          userJustification: reviewedAnalysis.editReason, // User's explanation if overridden
-          // Keep original fields for backward compatibility
-          category: aiAnalysis.category,
-          department: aiAnalysis.department,
-          priority: aiAnalysis.priority,
+          userOverride: reviewedAnalysis.userEdited,
+          userJustification: reviewedAnalysis.editReason,
+          suggestedCategory: aiAnalysis.category,
+          suggestedDepartment: aiAnalysis.department,
+          suggestedPriority: aiAnalysis.priority,
+          category: reviewedAnalysis.category,
+          department: reviewedDepartment,
+          priority: reviewedAnalysis.priority,
           summary: aiAnalysis.summary,
           confidence: aiAnalysis.confidence,
           imageDescriptionAlignment: aiAnalysis.imageDescriptionAlignment,
@@ -197,22 +196,25 @@ export default function ReportDrawer({
           visibleHazards: aiAnalysis.visibleHazards,
           severityEstimate: aiAnalysis.severityEstimate,
           priorityExplanation: aiAnalysis.priorityExplanation,
-          recommendedDepartment: aiAnalysis.recommendedDepartment,
+          recommendedDepartment: reviewedDepartment,
           urgencyIndicators: aiAnalysis.urgencyIndicators,
         },
       };
 
-      // Add report to Firestore
       await addReport(reportData);
 
       // Reset form
       setDescription("");
-      setCategory(""); // Reset category dropdown
+      setCategory("");
 
       // Close drawer and reset review state
       setDrawerOpen(false);
       setShowAiReview(false);
       setAiAnalysis(null);
+      setCheckedForDuplicates(false);
+      setAnalysisFingerprint("");
+      setPotentialDuplicates([]);
+      setShowDuplicateWarning(false);
 
       // Show success message
       alert("Report submitted successfully!");
@@ -225,10 +227,14 @@ export default function ReportDrawer({
     }
   };
 
-  // Handle cancellation from AI analysis review
+  // Handle cancellation from automated analysis review
   const handleAiReviewCancel = () => {
     setShowAiReview(false);
     setAiAnalysis(null);
+    setCheckedForDuplicates(false);
+    setAnalysisFingerprint("");
+    setPotentialDuplicates([]);
+    setShowDuplicateWarning(false);
   };
 
   return (
@@ -274,8 +280,7 @@ export default function ReportDrawer({
                 <button
                   onClick={() => {
                     setShowDuplicateWarning(false);
-                    // Proceed with submission after acknowledging
-                    handleDuplicatedSubmit(new Event("submit"));
+                    setShowAiReview(true);
                   }}
                   className="ds-btn" style={{ height: "32px", fontSize: "12px", padding: "0 12px", backgroundColor: "var(--color-amber)", color: "#fff" }}
                 >
@@ -285,7 +290,7 @@ export default function ReportDrawer({
                   onClick={() => setShowDuplicateWarning(false)}
                   className="ds-btn ds-btn-secondary" style={{ height: "32px", fontSize: "12px", padding: "0 12px", borderColor: "var(--color-amber)", color: "var(--color-amber)" }}
                 >
-                  Review Reports
+                  Edit report
                 </button>
               </div>
             </div>
@@ -305,7 +310,7 @@ export default function ReportDrawer({
 
     {/* Scrollable Content */}
     <div className="overflow-y-auto" style={{ height: "calc(70vh - 75px)", padding: "24px" }}>
-      {/* Show AI Review screen if active */}
+      {/* Show automated review screen if active */}
       {showAiReview && aiAnalysis && (
         <AIAnalysisReview
           description={description}
@@ -327,6 +332,7 @@ export default function ReportDrawer({
 
             <textarea
               rows={4}
+              maxLength={2000}
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -342,12 +348,17 @@ export default function ReportDrawer({
           {/* Category */}
           <div>
             <label className="ds-input-label">
-              Category
+              Category (optional)
             </label>
 
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setCheckedForDuplicates(false);
+                setShowDuplicateWarning(false);
+                setAiAnalysis(null);
+              }}
               className="ds-select"
             >
               <option value="">Select Category</option>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MapView from "../components/MapView";
 import ReportDrawer from "../components/ReportDrawer";
-import { getReports } from "../services/firebase";
+import { getPublicReports, isFirebaseConfigured } from "../services/firebase";
 import { getResolutionRate } from "../utils/analytics";
 import { formatTimestamp } from "../utils/reports";
 
@@ -10,7 +10,7 @@ export default function CitizenHub() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Road");
+  const [category, setCategory] = useState("");
 
   const [location, setLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState("");
@@ -21,12 +21,13 @@ export default function CitizenHub() {
   const [stats, setStats] = useState({ total: 0, pending: 0, resolutionRate: 0 });
   const [recentReports, setRecentReports] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [dataError, setDataError] = useState("");
 
   // Fetch Live Data
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await getReports();
+        const data = await getPublicReports();
         
         // Calculate stats using existing data array
         const total = data.length;
@@ -39,6 +40,7 @@ export default function CitizenHub() {
         setRecentReports(data.slice(0, 5));
       } catch (err) {
         console.error("Error fetching live data for hub:", err);
+        setDataError("Live civic data is unavailable. The Firebase rules and publicReports collection may not be deployed yet.");
       } finally {
         setLoadingData(false);
       }
@@ -76,20 +78,21 @@ export default function CitizenHub() {
 
   const handleSubmissionSuccess = () => {
     setDescription("");
-    setCategory("Road");
+    setCategory("");
     setLocation(null);
     setLocationStatus("");
     setDrawerOpen(false);
     
     // Refresh live data after submission
-    getReports().then((data) => {
+    getPublicReports().then((data) => {
+      setDataError("");
       setStats({
         total: data.length,
         pending: data.filter((r) => r.status === "pending").length,
         resolutionRate: getResolutionRate(data),
       });
       setRecentReports(data.slice(0, 5));
-    });
+    }).catch(() => setDataError("The report was saved, but the public activity feed could not be refreshed."));
   };
 
   const scrollToMap = () => {
@@ -127,11 +130,11 @@ export default function CitizenHub() {
           </h1>
           
           <h2 style={{ fontSize: "clamp(24px, 4vw, 32px)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text-primary)", margin: "0 0 24px" }}>
-            AI-Powered Civic Issue Management
+            Clear, Fast Civic Issue Management
           </h2>
           
           <p className="ds-body" style={{ fontSize: "20px", color: "var(--color-text-secondary)", marginBottom: "48px" }}>
-            Helping citizens and authorities work together using Google Gemini AI. Report local issues, track resolution, and build a better city.
+            Report local issues, get transparent rule-based routing, and help municipal teams resolve problems faster—without sending your report to an AI provider.
           </p>
           
           <div className="ds-flex-center" style={{ gap: "16px", flexWrap: "wrap" }}>
@@ -155,6 +158,16 @@ export default function CitizenHub() {
       {/* Live Data & Recent Reports Section */}
       <section className="ds-container" style={{ paddingBlock: "80px" }}>
         <h2 className="ds-title" style={{ marginBottom: "32px", textAlign: "center" }}>Live City Activity</h2>
+        {!isFirebaseConfigured && (
+          <div className="ds-card" style={{ marginBottom: "24px", borderLeft: "4px solid var(--color-amber)" }}>
+            <p className="ds-body" style={{ margin: 0 }}>Live civic data is not configured for this deployment. The site remains available, but submissions and authority access are disabled.</p>
+          </div>
+        )}
+        {dataError && (
+          <div className="ds-card" role="status" style={{ marginBottom: "24px", borderLeft: "4px solid var(--color-error)" }}>
+            <p className="ds-body" style={{ margin: 0 }}>{dataError}</p>
+          </div>
+        )}
         
         {loadingData ? (
           <div className="ds-grid-cards">
@@ -191,17 +204,17 @@ export default function CitizenHub() {
                 <div className="ds-flex-between" style={{ marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div className="ds-flex-center" style={{ gap: "8px" }}>
                     <span className="ds-chip">{report.category}</span>
-                    <span className={`ds-badge ds-badge-${report.status}`}>{report.status.toUpperCase()}</span>
+                    <span className={`ds-badge ds-badge-${report.status || "pending"}`}>{String(report.status || "pending").toUpperCase()}</span>
                   </div>
                   <span className="ds-label ds-secondary">
                     {formatTimestamp(report.createdAt)}
                   </span>
                 </div>
-                <p className="ds-card-title">{report.description}</p>
+                <p className="ds-card-title">{report.category || "Civic"} issue reported near this location.</p>
                 {report.location && (
                   <p className="ds-body ds-secondary" style={{ marginTop: "8px", fontSize: "12px" }}>
                     <span className="material-symbols-outlined" style={{ fontSize: "14px", verticalAlign: "middle", marginRight: "4px" }}>location_on</span>
-                    {(report.location.latitude ?? report.location.lat).toFixed(5)}, {(report.location.longitude ?? report.location.lng).toFixed(5)}
+                    {Number(report.location.latitude ?? report.location.lat).toFixed(3)}, {Number(report.location.longitude ?? report.location.lng).toFixed(3)} (approximate)
                   </p>
                 )}
               </div>

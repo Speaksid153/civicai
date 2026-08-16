@@ -1,0 +1,154 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isVerifiedOwner() {
+      return request.auth != null
+        && request.auth.token.email == 'rsiddharth499@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isAuthority() {
+      return isVerifiedOwner()
+        || (request.auth != null
+        && exists(/databases/$(database)/documents/authorities/$(request.auth.uid))
+        && get(/databases/$(database)/documents/authorities/$(request.auth.uid)).data.active == true);
+    }
+
+    function validCategory(value) {
+      return value in ['Road', 'Garbage', 'Water', 'Electricity', 'Drainage', 'Other'];
+    }
+
+    function validPriority(value) {
+      return value in ['Low', 'Medium', 'High', 'Critical'];
+    }
+
+    function validStatus(value) {
+      return value in ['pending', 'assigned', 'resolved', 'archived'];
+    }
+
+    function validLocation(value) {
+      return value is map
+        && value.keys().hasOnly(['latitude', 'longitude'])
+        && value.latitude is number
+        && value.longitude is number
+        && value.latitude >= -90
+        && value.latitude <= 90
+        && value.longitude >= -180
+        && value.longitude <= 180;
+    }
+
+    function validCitizenReport() {
+      return request.resource.data.keys().hasOnly([
+          'description', 'category', 'priority', 'location', 'imageUrl', 'analysis',
+          'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
+          'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt', 'createdAt'
+        ])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 10
+        && request.resource.data.description.size() <= 2000
+        && validCategory(request.resource.data.category)
+        && validPriority(request.resource.data.priority)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.analysis is map
+        && request.resource.data.analysis.category == request.resource.data.category
+        && request.resource.data.analysis.priority == request.resource.data.priority
+        && request.resource.data.analysis.department is string
+        && request.resource.data.analysis.department.size() <= 120
+        && request.resource.data.analysis.summary is string
+        && request.resource.data.analysis.summary.size() <= 500
+        && request.resource.data.analysis.confidence is number
+        && request.resource.data.analysis.confidence >= 0
+        && request.resource.data.analysis.confidence <= 100
+        && request.resource.data.analysis.matchSignals is list
+        && request.resource.data.analysis.matchSignals.size() <= 24
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.assignedDepartment == ''
+        && request.resource.data.assignedOfficer == ''
+        && request.resource.data.assignedBy == ''
+        && request.resource.data.assignedAt == null
+        && request.resource.data.resolvedBy == ''
+        && request.resource.data.resolutionNotes == ''
+        && request.resource.data.afterImageUrl == ''
+        && request.resource.data.resolvedAt == null
+        && request.resource.data.archivedAt == null
+        && request.resource.data.imageUrl == null
+        && validLocation(request.resource.data.location);
+    }
+
+    function validAuthorityReportUpdate() {
+      return request.resource.data.keys().hasOnly([
+          'description', 'category', 'priority', 'location', 'imageUrl', 'analysis',
+          'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
+          'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt', 'createdAt'
+        ])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'priority', 'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
+          'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt'
+        ])
+        && validPriority(request.resource.data.priority)
+        && validStatus(request.resource.data.status)
+        && request.resource.data.assignedDepartment is string
+        && request.resource.data.assignedDepartment.size() <= 120
+        && request.resource.data.assignedOfficer is string
+        && request.resource.data.assignedOfficer.size() <= 120
+        && request.resource.data.assignedBy is string
+        && request.resource.data.assignedBy.size() <= 320
+        && (request.resource.data.assignedAt == null || request.resource.data.assignedAt is timestamp)
+        && request.resource.data.resolvedBy is string
+        && request.resource.data.resolvedBy.size() <= 120
+        && request.resource.data.resolutionNotes is string
+        && request.resource.data.resolutionNotes.size() <= 2000
+        && request.resource.data.afterImageUrl is string
+        && request.resource.data.afterImageUrl.size() <= 2048
+        && (request.resource.data.resolvedAt == null || request.resource.data.resolvedAt is timestamp)
+        && (request.resource.data.archivedAt == null || request.resource.data.archivedAt is timestamp);
+    }
+
+    function validPublicReport(value) {
+      return value.keys().hasOnly([
+          'category', 'status', 'priority', 'location', 'matchSignals', 'createdAt'
+        ])
+        && validCategory(value.category)
+        && validPriority(value.priority)
+        && validStatus(value.status)
+        && validLocation(value.location)
+        && value.matchSignals is list
+        && value.matchSignals.size() <= 24
+        && value.createdAt is timestamp;
+    }
+
+    function publicMatchesPrivate(reportId) {
+      return existsAfter(/databases/$(database)/documents/reports/$(reportId))
+        && getAfter(/databases/$(database)/documents/reports/$(reportId)).data.category == request.resource.data.category
+        && getAfter(/databases/$(database)/documents/reports/$(reportId)).data.priority == request.resource.data.priority
+        && getAfter(/databases/$(database)/documents/reports/$(reportId)).data.status == request.resource.data.status
+        && getAfter(/databases/$(database)/documents/reports/$(reportId)).data.analysis.matchSignals == request.resource.data.matchSignals;
+    }
+
+    match /authorities/{userId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == userId || isVerifiedOwner());
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow create: if validCitizenReport();
+      allow read: if isAuthority();
+      allow update: if isAuthority() && validAuthorityReportUpdate();
+      allow delete: if false;
+    }
+
+    match /publicReports/{reportId} {
+      allow read: if true;
+      allow create: if validPublicReport(request.resource.data)
+        && request.resource.data.status == 'pending'
+        && publicMatchesPrivate(reportId);
+      allow update: if isAuthority()
+        && validPublicReport(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'priority'])
+        && publicMatchesPrivate(reportId);
+      allow delete: if false;
+    }
+  }
+}

@@ -1,5 +1,14 @@
 import { formatTimestamp } from "../utils/reports";
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ReportCard({
   report,
   onAssign,
@@ -31,6 +40,8 @@ export default function ReportCard({
 
   const priorityKey = report.priority || "Low";
   const cardBorderClass = `ds-card-priority-${priorityKey.toLowerCase()}`;
+  const analysis = report.analysis || report.ai;
+  const safeAfterImageUrl = safeExternalUrl(report.afterImageUrl);
 
   return (
     <div
@@ -43,7 +54,7 @@ export default function ReportCard({
       {/* Tags & Status */}
       <div style={{ display: "flex", alignItems: "center", justifyItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
         <span className={`ds-badge ${statusMap[report.status] || "ds-badge-archived"}`}>
-          {report.status.toUpperCase()}
+          {String(report.status || "pending").toUpperCase()}
         </span>
         {report.priority && (
           <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "var(--font-weight-medium)" }} className={priorityMap[report.priority] || ""}>
@@ -115,11 +126,11 @@ export default function ReportCard({
               <p style={{ margin: 0 }}><strong>Archived At:</strong> {formatTimestamp(report.archivedAt)}</p>
             )}
             <p style={{ margin: 0 }}><strong>Notes:</strong> {report.resolutionNotes || "Not available"}</p>
-            {report.afterImageUrl && (
+            {safeAfterImageUrl && (
               <p style={{ margin: 0 }}>
                 <strong>After Image:</strong>{" "}
                 <a
-                  href={report.afterImageUrl}
+                  href={safeAfterImageUrl}
                   target="_blank"
                   rel="noreferrer"
                   style={{ color: "var(--color-primary)", textDecoration: "underline" }}
@@ -133,22 +144,22 @@ export default function ReportCard({
         </div>
       )}
 
-      {/* 🤖 AI Analysis */}
-      {report.ai && (
+      {/* Automated routing analysis */}
+      {analysis && (
         <div className="ds-card-inset" style={{ marginTop: "8px", backgroundColor: "var(--color-primary-pastel)", border: "none", padding: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
             <span className="material-symbols-outlined" style={{ color: "var(--color-primary)", fontSize: "18px" }}>auto_awesome</span>
-            <span className="ds-label" style={{ color: "var(--color-primary)", margin: 0 }}>AI ANALYSIS</span>
-            <span className="ds-badge ds-badge-assigned" style={{ marginLeft: "auto", fontSize: "11px", padding: "2px 8px" }}>{report.ai.confidence}% Confident</span>
+            <span className="ds-label" style={{ color: "var(--color-primary)", margin: 0 }}>ROUTING ANALYSIS</span>
+            <span className="ds-badge ds-badge-assigned" style={{ marginLeft: "auto", fontSize: "11px", padding: "2px 8px" }}>{analysis.confidence}% rule match</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px" }}>
-            <p style={{ margin: 0 }}><strong>Category:</strong> {report.ai.category}</p>
-            <p style={{ margin: 0 }}><strong>Department:</strong> {report.ai.department}</p>
+            <p style={{ margin: 0 }}><strong>Category:</strong> {analysis.category}</p>
+            <p style={{ margin: 0 }}><strong>Department:</strong> {analysis.department}</p>
             <p style={{ margin: 0 }}>
               <strong>Suggested Priority:</strong>{" "}
-              <span className={priorityMap[report.ai.priority] || ""}>{report.ai.priority}</span>
+              <span className={priorityMap[analysis.priority] || ""}>{analysis.priority}</span>
             </p>
-            <p style={{ margin: 0, marginTop: "4px", lineHeight: "1.5" }}><strong>Summary:</strong> {report.ai.summary}</p>
+            <p style={{ margin: 0, marginTop: "4px", lineHeight: "1.5" }}><strong>Summary:</strong> {analysis.summary}</p>
           </div>
         </div>
       )}

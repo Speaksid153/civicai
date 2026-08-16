@@ -76,7 +76,7 @@ export default function HistoryPage() {
   const filteredReports = reports.filter((report) => {
     const text = search.toLowerCase().trim();
     const reportDepartment =
-      report.assignedDepartment || report.ai?.department || "";
+      report.assignedDepartment || report.analysis?.department || report.ai?.department || "";
     const reportDate = formatDateInput(
       report.resolvedAt ||
         report.archivedAt ||
@@ -88,7 +88,7 @@ export default function HistoryPage() {
       [
         report.description,
         report.category,
-        report.ai?.category,
+        report.analysis?.category || report.ai?.category,
         reportDepartment,
         report.assignedOfficer,
         report.priority,
@@ -110,7 +110,7 @@ export default function HistoryPage() {
   });
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--color-bg-app)" }}>
+    <div className="authority-shell" style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--color-bg-app)" }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
       <AuthorityNav user={getCurrentUser()} setToast={setToast} />
 
@@ -127,9 +127,6 @@ export default function HistoryPage() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button className="ds-btn-icon" aria-label="Notifications">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
             {getCurrentUser() && (
               <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "var(--color-primary-pastel)", color: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
                 {getCurrentUser().email.charAt(0).toUpperCase()}

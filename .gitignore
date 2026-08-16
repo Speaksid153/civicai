@@ -60,3 +60,5 @@ Thumbs.db
 # Firebase
 # ==========================
 .firebase/
+.vercel
+.env*

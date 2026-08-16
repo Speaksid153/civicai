@@ -1,148 +1,89 @@
 # CivicAI
 
-**The Smart Civic Issue Reporting Platform for India.**
+CivicAI is a civic issue reporting and municipal operations dashboard for Bengaluru. Citizens can submit a geolocated issue, while approved authority accounts can triage, assign, resolve, archive, and analyze reports.
 
-CivicAI is an intelligent, multi-agent civic issue management system that empowers citizens and streamlines municipal authorities to triage, manage, and resolve civic complaints faster.
+## Why there are no AI API keys
 
-![Hero Screenshot](screenshots/hero.png)
+The original browser application embedded Gemini and Groq credentials in its JavaScript bundle. Any visitor could extract and spend those credentials. This version removes both providers and the `@google/genai` dependency entirely.
 
-## 📖 Project Overview
+Classification, priority suggestions, hazard flags, duplicate scoring, operational insights, and weekly reports now run through a deterministic local rules engine in `src/services/civicIntelligence.js`. This design is:
 
-Indian urban centers, particularly cities like Bengaluru, suffer from an overwhelming volume of unorganized civic complaints spanning multiple jurisdictions (BBMP, BWSSB, BESCOM). 
+- token-free and available offline after the app loads;
+- fast and predictable;
+- auditable, because the same input produces the same output;
+- honest about its limitations: it is rules-based routing, not semantic model inference.
 
-CivicAI solves this by providing a unified reporting interface for citizens. Behind the scenes, it utilizes advanced AI agents to automatically classify issues, assign priorities, detect duplicates, and route complaints to the precise department responsible. It transforms civic reporting from a chaotic black box into a transparent, actionable pipeline.
+## Security model
 
-## ✨ Features
+- Firebase web configuration is public application metadata, not a server secret. Security must come from Firestore Rules, authorized domains, App Check, quotas, and monitoring.
+- Full reports and exact coordinates are stored in the private `reports` collection.
+- The public dashboard reads sanitized records from `publicReports`, which contain a coarse location and no free-text description.
+- Authority access uses a one-time Firebase email sign-in link. The verified bootstrap owner is checked in both Firestore Rules and the client route.
+- Public self-registration for authority accounts has been removed.
+- `firestore.rules` denies public reads of private reports and denies deletes.
 
-- **AI-Powered Classification:** Automatically routes issues to the correct department (e.g., BESCOM, BWSSB, Traffic Police).
-- **Multi-Provider AI Pipeline:** Enterprise-grade reliability using Gemini as the primary engine with Groq as an instant, silent failover.
-- **Smart Duplicate Detection:** Identifies semantic duplicates of nearby issues within a 1km radius to prevent authority spam.
-- **Authority Dashboard:** Real-time triage board for municipal workers to track Pending, Assigned, and Resolved tasks.
-- **Citizen Dashboard & History:** Track the exact status of your submissions securely.
-- **Ward-Level Analytics:** AI-generated executive summaries and insights to highlight systemic issues across wards.
-- **Session Caching:** Prevents redundant API calls for duplicate submission attempts.
-- **Graceful Fallback Classifier:** A deterministic local safety net ensures 100% uptime even if all external AI services fail.
+Before production, enable Firebase App Check and set budget/usage alerts. Client-only code cannot reliably rate-limit anonymous abuse.
 
-## 🧠 AI Architecture
+## Local setup
 
-CivicAI relies on a highly resilient provider chain. The application intercepts all AI requests, verifies them against a session cache, and runs them through a cascading failover system. 
-
-```mermaid
-flowchart TD
-    Start[Report Submission] --> Cache{In Cache?}
-    Cache -->|Yes| End[Return Cached Result]
-    Cache -->|No| Gemini[Gemini 2.5 Flash]
-    
-    Gemini -->|Success| Normalize[Normalize Response]
-    Gemini -->|Transient Failure| GeminiRetry[Retry Gemini]
-    GeminiRetry -->|Success| Normalize
-    GeminiRetry -->|Failure| Groq[Groq Llama 3.3]
-    Gemini -->|Fatal Error 4xx| Groq
-    
-    Groq -->|Success| Normalize
-    Groq -->|Transient Failure| GroqRetry[Retry Groq]
-    GroqRetry -->|Success| Normalize
-    GroqRetry -->|Failure| LocalFallback[Local Keyword Classifier]
-    Groq -->|Fatal Error 4xx| LocalFallback
-    
-    LocalFallback --> Normalize
-    Normalize --> End
+```bash
+npm install
+copy .env.example .env
+npm run dev
 ```
 
-### Triage & Routing
-The AI evaluates text descriptions to determine the `category` (Road, Water, Garbage, etc.) and precisely assigns the `department`. It assigns a `priority` (Low to Critical) based on extracted urgency indicators (e.g., "blocking traffic", "live wire").
+Set these public Firebase web configuration values in `.env` and in the hosting environment:
 
-## 🛠 Tech Stack
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_AUTHORITY_EMAIL` (must match the verified bootstrap owner in `firestore.rules`)
 
-| Technology | Purpose |
-| :--- | :--- |
-| **React 19** | Frontend Framework |
-| **Vite** | Build Tool & Dev Server |
-| **Firebase Auth** | Secure User Authentication |
-| **Firestore** | Real-time NoSQL Database |
-| **Google Gemini** | Primary AI Analysis Engine |
-| **Groq** | Secondary AI Failover Engine |
+No Gemini, Groq, OpenAI, or other chatbot token is used.
 
-## 📂 Project Structure
+For non-Firebase hosting, the production domain is used as `VITE_FIREBASE_AUTH_DOMAIN` and `/__/auth/*` is reverse-proxied to the project's `firebaseapp.com` helper. The authority flow itself is passwordless email-link authentication, so it does not depend on OAuth popups or cross-site redirect state.
 
-```text
-src/
-├── assets/         # Static images and icons
-├── components/     # Reusable React UI components (ReportDrawer, Tabs)
-├── pages/          # Application views (Dashboards, Login, History)
-├── services/
-│   ├── firebase.js          # Firebase configuration and DB access
-│   ├── ai.js                # Core AI orchestrator
-│   ├── fallbackClassifier.js# Local deterministic safety net
-│   └── providers/           # Abstracted AI providers (Gemini, Groq)
+## Authority provisioning
+
+The initial owner requests a one-time link using the email configured in `VITE_AUTHORITY_EMAIL` and `firestore.rules`. This email is public configuration, not a secret; Firestore trusts only the verified email claim in Firebase's signed ID token.
+
+The production login currently sends links only to the configured bootstrap owner to prevent public email abuse. Before onboarding additional staff, extend that allow-list in a trusted backend, then create `authorities/{uid}` with at least:
+
+```json
+{
+  "active": true,
+  "name": "Officer name",
+  "department": "BBMP Roads"
+}
 ```
 
-## 🚀 Installation
+Deploy `firestore.rules` using the Firebase CLI or Firebase console after any authorization-policy changes.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/CivicAI/civicai.git
-   cd civicai
-   ```
+Never rely on the frontend email comparison by itself. The deployed `firestore.rules` independently checks the signed, verified Firebase identity before granting access.
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## Commands
 
-3. **Configure Environment Variables:**
-   Copy `.env.example` to `.env` and fill in your keys:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+npm run dev       # local development
+npm run build     # production build
+npm run lint      # static checks
+npm test          # local rules-engine tests
+```
 
-4. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
+## Main stack
 
-## 🔐 Environment Variables
+- React 19 and Vite
+- Firebase Authentication and Firestore
+- Leaflet / OpenStreetMap
+- Deterministic local civic rules engine
 
-You will need the following variables in your `.env` file:
+## Known operational work
 
-- `VITE_GEMINI_API_KEY`: API Key for Google Gemini (Primary)
-- `VITE_GROQ_API_KEY`: API Key for Groq (Secondary)
-- `VITE_FIREBASE_API_KEY`: Firebase API Key
-- `VITE_FIREBASE_AUTH_DOMAIN`: Firebase Auth Domain
-- `VITE_FIREBASE_PROJECT_ID`: Firebase Project ID
-- `VITE_FIREBASE_STORAGE_BUCKET`: Firebase Storage Bucket
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`: Firebase Messaging Sender ID
-- `VITE_FIREBASE_APP_ID`: Firebase App ID
+- Existing private reports need a one-time migration into sanitized `publicReports` documents if they should appear on the public activity view.
+- Firebase App Check and platform-level rate limiting must be enabled in the deployed Firebase project.
+- Authority membership documents must be administered outside the public client.
 
-*(Never commit your real `.env` file to version control.)*
-
-## 📸 Screenshots
-
-| Landing Page | Citizen Dashboard |
-|:---:|:---:|
-| ![Landing Page](screenshots/hero.png) | ![Citizen Dashboard](screenshots/citizen-dashboard.png) |
-
-| Authority Dashboard | Analytics Dashboard |
-|:---:|:---:|
-| ![Authority Dashboard](screenshots/authority-dashboard.png) | ![Analytics](screenshots/analytics.png) |
-
-| Report Submission | History |
-|:---:|:---:|
-| ![Submission](screenshots/submission.png) | ![History](screenshots/history.png) |
-
-## 🔮 Future Roadmap
-
-- [ ] Mobile Application (React Native)
-- [ ] AI Image Analysis (currently removed for latency optimization)
-- [ ] Predictive Hotspot Detection for City Planners
-- [ ] Direct API Integration with BBMP / BWSSB systems
-- [ ] Push Notifications for Status Updates
-- [ ] Offline Reporting Capabilities
-
-## 👥 Created By
-
-- Siddharth. R 
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Licensed under the MIT License.

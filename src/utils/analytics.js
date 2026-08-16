@@ -1,7 +1,7 @@
 import {
   formatDateInput,
   getReportTimestamp,
-} from "./reports";
+} from "./reports.js";
 
 function countBy(reports, getKey) {
   return reports.reduce((totals, report) => {
@@ -17,7 +17,7 @@ function countBy(reports, getKey) {
 export function getReportsByCategory(reports) {
   return countBy(
     reports,
-    (report) => report.category || report.ai?.category
+    (report) => report.category || report.analysis?.category || report.ai?.category
   );
 }
 
@@ -25,7 +25,7 @@ export function getReportsByDepartment(reports) {
   return countBy(
     reports,
     (report) =>
-      report.assignedDepartment || report.ai?.department
+      report.assignedDepartment || report.analysis?.department || report.ai?.department
   );
 }
 
@@ -34,13 +34,7 @@ export function getReportsByStatus(reports) {
 }
 
 export function getReportsByDay(reports) {
-  return countBy(reports, (report) =>
-    formatDateInput(
-      report.resolvedAt ||
-        report.archivedAt ||
-        report.createdAt
-    )
-  );
+  return countBy(reports, (report) => formatDateInput(report.createdAt));
 }
 
 export function getReportsByMonth(reports) {
