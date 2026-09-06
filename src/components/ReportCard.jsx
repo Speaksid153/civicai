@@ -1,5 +1,6 @@
 import { formatTimestamp } from "../utils/reports";
 import { isSyntheticReport } from "../utils/analytics";
+import { getCategoryMarkerStyle } from "../utils/mapCategories";
 
 function safeExternalUrl(value) {
   try {
@@ -43,6 +44,7 @@ export default function ReportCard({
   const cardBorderClass = `ds-card-priority-${priorityKey.toLowerCase()}`;
   const analysis = report.analysis || report.ai;
   const safeAfterImageUrl = safeExternalUrl(report.afterImageUrl);
+  const categoryStyle = getCategoryMarkerStyle(report.category);
 
   return (
     <div
@@ -66,7 +68,12 @@ export default function ReportCard({
             {report.priority}
           </span>
         )}
-        <span className="ds-chip" style={{ marginLeft: "auto" }}>{report.category}</span>
+        <span
+          className="ds-chip"
+          style={{ marginLeft: "auto", color: categoryStyle.color, background: categoryStyle.background }}
+        >
+          {report.category}
+        </span>
       </div>
 
       {/* Description */}

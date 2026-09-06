@@ -12,6 +12,7 @@ export default function MapView({ location }) {
       center={[12.9716, 77.5946]}
       zoom={13}
       zoomControl={false}
+      scrollWheelZoom={false}
       className="h-full w-full z-0"
     >
       <TileLayer

@@ -6,6 +6,7 @@ import DemoDataNotice from "../components/DemoDataNotice";
 import { getPublicReports, isFirebaseConfigured } from "../services/firebase";
 import { getResolutionRate, isSyntheticReport } from "../utils/analytics";
 import { formatTimestamp } from "../utils/reports";
+import { getCategoryMarkerStyle } from "../utils/mapCategories";
 
 export default function CitizenHub() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -213,7 +214,15 @@ export default function CitizenHub() {
               <div key={report.id} className={`ds-card ${getPriorityClass(report.priority)} ds-stagger-item`} style={{ animationDelay: `${200 + i * 50}ms` }}>
                 <div className="ds-flex-between" style={{ marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div className="ds-flex-center" style={{ gap: "8px" }}>
-                    <span className="ds-chip">{report.category}</span>
+                    <span
+                      className="ds-chip"
+                      style={{
+                        color: getCategoryMarkerStyle(report.category).color,
+                        background: getCategoryMarkerStyle(report.category).background,
+                      }}
+                    >
+                      {report.category}
+                    </span>
                     <span className={`ds-badge ds-badge-${report.status || "pending"}`}>{String(report.status || "pending").toUpperCase()}</span>
                     {isSyntheticReport(report) && <span className="ds-badge ds-badge-assigned">DEMO</span>}
                   </div>

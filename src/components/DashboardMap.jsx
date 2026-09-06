@@ -11,32 +11,30 @@ import { useEffect } from "react";
 import L from "leaflet";
 
 import "leaflet/dist/leaflet.css";
+import { categoryMarkerStyles, getCategoryMarkerStyle } from "../utils/mapCategories";
 
-const statusMarkerColors = {
-  pending: "#ca8a04",
-  assigned: "#2563eb",
-  resolved: "#16a34a",
-  archived: "#4b5563",
-};
-
-function createStatusIcon(status, selected) {
-  const color =
-    statusMarkerColors[status] || "#2563eb";
+function createCategoryIcon(category, selected) {
+  const { color, label } = getCategoryMarkerStyle(category);
+  const size = selected ? 30 : 24;
 
   return L.divIcon({
     className: "",
     html: `
       <div style="
-        width: ${selected ? 24 : 18}px;
-        height: ${selected ? 24 : 18}px;
+        width: ${size}px;
+        height: ${size}px;
         background: ${color};
         border: 3px solid white;
         border-radius: 9999px;
         box-shadow: 0 3px 10px rgba(0,0,0,0.35);
-      "></div>
+        color: white;
+        display: grid;
+        place-items: center;
+        font: 700 ${selected ? 13 : 11}px/1 system-ui, sans-serif;
+      ">${label}</div>
     `,
-    iconSize: [selected ? 24 : 18, selected ? 24 : 18],
-    iconAnchor: [selected ? 12 : 9, selected ? 12 : 9],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -85,6 +83,7 @@ export default function DashboardMap({
         <MapContainer
           center={[12.9716, 77.5946]}
           zoom={11}
+          scrollWheelZoom={false}
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
@@ -103,8 +102,9 @@ export default function DashboardMap({
             return (
               <Marker
                 key={report.id}
-                icon={createStatusIcon(report.status, selected)}
+                icon={createCategoryIcon(report.category, selected)}
                 position={coords}
+                title={`${report.category || "Other"} report — ${report.status || "pending"}`}
                 eventHandlers={{
                   click: () => onSelectReport?.(report),
                 }}
@@ -123,6 +123,33 @@ export default function DashboardMap({
             );
           })}
         </MapContainer>
+        <div
+          aria-label="Case category legend"
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            zIndex: 500,
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(90px, 1fr))",
+            gap: "8px 12px",
+            padding: "12px",
+            borderRadius: "10px",
+            background: "rgba(255, 255, 255, 0.94)",
+            boxShadow: "0 3px 12px rgba(0,0,0,0.16)",
+            fontSize: "12px",
+          }}
+        >
+          {Object.entries(categoryMarkerStyles).map(([category, style]) => (
+            <div key={category} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              <span
+                aria-hidden="true"
+                style={{ width: "12px", height: "12px", borderRadius: "50%", background: style.color, flexShrink: 0 }}
+              />
+              <span>{category}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

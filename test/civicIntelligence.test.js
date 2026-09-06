@@ -8,6 +8,7 @@ import {
 } from "../src/services/civicIntelligence.js";
 import { getResolutionRate, isSyntheticReport } from "../src/utils/analytics.js";
 import { buildLifecycleDemoReports } from "../src/services/demoLifecycleData.js";
+import { categoryMarkerStyles, getCategoryMarkerStyle } from "../src/utils/mapCategories.js";
 
 test("routes common civic descriptions without a remote model", () => {
   const road = analyzeReport("A deep pothole is blocking traffic outside the school");
@@ -132,4 +133,10 @@ test("labels demo records and calculates the planned proof dataset honestly", ()
   assert.equal(combined.length, 60);
   assert.equal(combined.filter((item) => item.status === "pending").length, 15);
   assert.equal(getResolutionRate(combined), 55);
+});
+
+test("uses a distinct map color for every civic category", () => {
+  const colors = Object.values(categoryMarkerStyles).map((style) => style.color);
+  assert.equal(new Set(colors).size, 6);
+  assert.deepEqual(getCategoryMarkerStyle("Unknown"), categoryMarkerStyles.Other);
 });
