@@ -119,6 +119,11 @@ test("labels demo records and calculates the planned proof dataset honestly", ()
   assert.equal(lifecycle.filter((item) => item.status === "resolved").length, 20);
   assert.equal(lifecycle.filter((item) => item.status === "archived").length, 13);
   assert.ok(lifecycle.every((item) => item.privateReport.description.startsWith("[SYNTHETIC DEMO")));
+  const lifecycleSpanDays = (
+    lifecycle[0].privateReport.createdAt.getTime()
+    - lifecycle.at(-1).privateReport.createdAt.getTime()
+  ) / 86_400_000;
+  assert.ok(lifecycleSpanDays >= 60);
 
   const combined = [
     ...Array.from({ length: 12 }, () => ({ status: "pending" })),

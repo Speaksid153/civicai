@@ -32,7 +32,9 @@ export function buildLifecycleDemoReports(now = new Date()) {
   return statuses.map((status, index) => {
     const [category, department, issue, resolution] = categories[index % categories.length];
     const [area, latitude, longitude] = locations[(index * 5) % locations.length];
-    const createdAt = new Date(now.getTime() - (index + 5) * 86_400_000);
+    // Spread the cases across more than eight calendar weeks so the weekly
+    // report selector demonstrates historical summaries instead of one spike.
+    const createdAt = new Date(now.getTime() - Math.floor(index * 1.35) * 86_400_000);
     const assignedAt = status === "pending" ? null : new Date(createdAt.getTime() + 86_400_000);
     const resolvedAt = ["resolved", "archived"].includes(status)
       ? new Date(createdAt.getTime() + 3 * 86_400_000)

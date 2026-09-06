@@ -259,7 +259,7 @@ export default function AuthorityDashboard() {
               <div>
                 <p className="ds-label" style={{ color: "var(--color-primary)", marginBottom: "6px" }}>PROOF DATASET</p>
                 <p className="ds-body" style={{ margin: 0 }}>
-                  Add 48 synthetic lifecycle cases to the existing {demoCount} examples, including assignments, resolutions, archive history, officers, timestamps, and resolution notes.
+                  Add 48 synthetic lifecycle cases across more than eight backdated weeks to the existing {demoCount} examples, including assignments, resolutions, archive history, officers, timestamps, and resolution notes.
                 </p>
                 <p className="ds-body ds-secondary" style={{ margin: "6px 0 0", fontSize: "13px" }}>
                   Result: 60 total · 15 pending · 12 assigned · 20 resolved · 13 archived.

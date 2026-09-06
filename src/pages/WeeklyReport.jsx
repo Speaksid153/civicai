@@ -7,6 +7,7 @@ import { observeAuth } from "../services/auth";
 import { buildWeeklyReport } from "../services/civicIntelligence";
 import { getReports } from "../services/firebase";
 import { getReportTimestamp } from "../utils/reports";
+import { isSyntheticReport } from "../utils/analytics";
 
 function localDateId(date) {
   const year = date.getFullYear();
@@ -17,7 +18,7 @@ function localDateId(date) {
 
 function getWeeks() {
   const today = new Date();
-  return Array.from({ length: 6 }, (_, index) => {
+  return Array.from({ length: 8 }, (_, index) => {
     const anchor = new Date(today);
     anchor.setDate(anchor.getDate() - index * 7);
     const start = new Date(anchor);
@@ -53,12 +54,23 @@ export default function WeeklyReport() {
     return () => { active = false; };
   }, []);
 
-  const selected = weeks.find((week) => week.id === selectedWeek) || weeks[0];
-  const weeklyReports = reports.filter((report) => {
-    const date = getReportTimestamp(report.createdAt);
-    return date && selected && date >= selected.start && date <= selected.end;
+  const weeklySummaries = weeks.map((week) => {
+    const weekReports = reports.filter((item) => {
+      const date = getReportTimestamp(item.createdAt);
+      return date && date >= week.start && date <= week.end;
+    });
+    return {
+      week,
+      reports: weekReports,
+      report: buildWeeklyReport(weekReports, week.label),
+      completed: weekReports.filter((item) => ["resolved", "archived"].includes(item.status)).length,
+      hasDemoData: weekReports.some(isSyntheticReport),
+    };
   });
-  const report = buildWeeklyReport(weeklyReports, selected?.label || "the selected week");
+  const selectedSummary = weeklySummaries.find((item) => item.week.id === selectedWeek) || weeklySummaries[0];
+  const selected = selectedSummary?.week;
+  const weeklyReports = selectedSummary?.reports || [];
+  const report = selectedSummary?.report || buildWeeklyReport([], "the selected week");
 
   if (!user) return <div className="ds-page ds-flex-center" style={{ minHeight: "100vh" }}>Checking login...</div>;
 
@@ -80,6 +92,45 @@ export default function WeeklyReport() {
               {weeks.map((week) => <option key={week.id} value={week.id}>{week.label}</option>)}
             </select>
           </div>
+
+          {!loading && (
+            <section className="ds-card ds-shadow-card" style={{ marginBottom: "24px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <p className="ds-label" style={{ color: "var(--color-primary)", marginBottom: "6px" }}>BACKDATED WEEKLY PROOF</p>
+                <h2 className="ds-title" style={{ margin: 0 }}>Eight-week operations history</h2>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "620px" }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-divider)" }}>
+                      <th style={{ padding: "12px" }}>Week</th>
+                      <th>Total</th>
+                      <th>Completed</th>
+                      <th>Resolution rate</th>
+                      <th>Data</th>
+                      <th aria-label="Open week" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeklySummaries.map((item) => (
+                      <tr key={item.week.id} style={{ borderBottom: "1px solid var(--color-divider)" }}>
+                        <td style={{ padding: "12px" }}><strong>{item.week.label}</strong></td>
+                        <td>{item.report.keyMetrics.totalReports}</td>
+                        <td>{item.completed}</td>
+                        <td>{item.report.keyMetrics.resolutionRate}%</td>
+                        <td>{item.hasDemoData ? <span className="ds-badge ds-badge-assigned">DEMO</span> : "—"}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <button className="ds-btn ds-btn-secondary" style={{ height: "32px", fontSize: "12px" }} onClick={() => setSelectedWeek(item.week.id)}>
+                            View summary
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {loading ? <LoadingSkeleton /> : (
             <article className="ds-card ds-shadow-card" style={{ padding: "clamp(24px, 5vw, 56px)" }}>
