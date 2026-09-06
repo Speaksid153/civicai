@@ -18,8 +18,7 @@ export default function ResolutionModal({
 }) {
   const [resolutionNotes, setResolutionNotes] =
     useState("");
-  const [resolvedBy, setResolvedBy] =
-    useState(defaultResolver || "");
+  const resolvedBy = defaultResolver || "";
   const [completionTime, setCompletionTime] =
     useState(formatDateTimeLocal());
   const [afterImageUrl, setAfterImageUrl] =
@@ -63,11 +62,12 @@ export default function ResolutionModal({
           </div>
 
           <div>
-            <label className="ds-input-label">Resolver Name</label>
+            <label className="ds-input-label">Resolver Account</label>
             <input
               value={resolvedBy}
-              onChange={(e) => setResolvedBy(e.target.value)}
-              placeholder="Resolver name"
+              readOnly
+              aria-readonly="true"
+              placeholder="Signed-in authority"
               maxLength={120}
               className="ds-input"
             />

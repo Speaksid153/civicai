@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getAuth } from "firebase/auth";
 import {
   collection,
@@ -13,7 +14,6 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { buildLifecycleDemoReports, DEMO_PREFIX } from "./demoLifecycleData";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,10 +26,18 @@ const firebaseConfig = {
 
 const requiredConfig = ["apiKey", "authDomain", "projectId", "appId"];
 export const isFirebaseConfigured = requiredConfig.every((key) => Boolean(firebaseConfig[key]));
+const appCheckSiteKey = String(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY || "").trim();
+export const isAppCheckConfigured = Boolean(appCheckSiteKey);
 const validCategories = new Set(["Road", "Garbage", "Water", "Electricity", "Drainage", "Other"]);
 const validPriorities = new Set(["Low", "Medium", "High", "Critical"]);
 
 export const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const appCheck = app && isAppCheckConfigured
+  ? initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+  : null;
 export const db = app ? getFirestore(app) : null;
 export const auth = app ? getAuth(app) : null;
 
@@ -63,6 +71,57 @@ function newestFirst(reports) {
   return reports.sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
 }
 
+function cleanString(value, maxLength) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function cleanStringList(value, maxItems, maxLength = 120) {
+  return Array.isArray(value)
+    ? value.slice(0, maxItems).map((item) => cleanString(item, maxLength)).filter(Boolean)
+    : [];
+}
+
+function cleanDuplicates(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).map((duplicate) => ({
+    reportId: cleanString(duplicate?.reportId, 128),
+    similarityScore: Math.max(0, Math.min(100, Number(duplicate?.similarityScore) || 0)),
+    suggestion: cleanString(duplicate?.suggestion, 240),
+  })).filter((duplicate) => duplicate.reportId && duplicate.suggestion);
+}
+
+function sanitizeAnalysis(value, category, priority) {
+  const source = value && typeof value === "object" ? value : {};
+  const department = cleanString(source.department || "BBMP Sanitation", 120);
+
+  return {
+    duplicates: cleanDuplicates(source.duplicates),
+    isLikelyDuplicate: Boolean(source.isLikelyDuplicate),
+    recommendation: cleanString(source.recommendation || "submit_new", 160),
+    category,
+    department,
+    confidence: Math.max(0, Math.min(100, Number(source.confidence) || 0)),
+    priority,
+    summary: cleanString(source.summary || "Report submitted for authority review.", 500),
+    imageDescriptionAlignment: cleanString(source.imageDescriptionAlignment || "Not assessed", 120),
+    authenticityAssessment: cleanString(source.authenticityAssessment || "Not assessed", 120),
+    visibleHazards: cleanStringList(source.visibleHazards, 8),
+    severityEstimate: cleanString(source.severityEstimate || priority, 32),
+    priorityExplanation: cleanString(source.priorityExplanation, 500),
+    recommendedDepartment: cleanString(source.recommendedDepartment || department, 120),
+    urgencyIndicators: cleanStringList(source.urgencyIndicators, 8, 32),
+    matchSignals: cleanStringList(source.matchSignals, 24, 64),
+    engine: cleanString(source.engine || "local-rules-v1", 64),
+    finalCategory: validCategories.has(source.finalCategory) ? source.finalCategory : category,
+    finalPriority: validPriorities.has(source.finalPriority) ? source.finalPriority : priority,
+    userOverride: Boolean(source.userOverride),
+    userJustification: cleanString(source.userJustification, 500),
+    suggestedCategory: validCategories.has(source.suggestedCategory) ? source.suggestedCategory : category,
+    suggestedDepartment: cleanString(source.suggestedDepartment || department, 120),
+    suggestedPriority: validPriorities.has(source.suggestedPriority) ? source.suggestedPriority : priority,
+  };
+}
+
 export async function addReport(data) {
   const database = requireDatabase();
   const description = String(data.description || "").trim();
@@ -76,28 +135,18 @@ export async function addReport(data) {
   const reportRef = doc(collection(database, "reports"));
   const publicRef = doc(database, "publicReports", reportRef.id);
   const createdAt = serverTimestamp();
-  const analysis = {
-    category: "Other",
-    department: "BBMP Sanitation",
-    priority: "Medium",
-    summary: "Report submitted for authority review.",
-    confidence: 0,
-    ...(data.analysis ?? {}),
-  };
   const category = validCategories.has(data.category) ? data.category : "Other";
   const priority = validPriorities.has(data.priority) ? data.priority : "Medium";
-  analysis.category = category;
-  analysis.priority = priority;
-  analysis.summary = String(analysis.summary || "Report submitted for authority review.").slice(0, 500);
-  analysis.matchSignals = Array.isArray(analysis.matchSignals) ? analysis.matchSignals.slice(0, 24) : [];
-  analysis.duplicates = Array.isArray(analysis.duplicates) ? analysis.duplicates.slice(0, 3) : [];
-  analysis.visibleHazards = Array.isArray(analysis.visibleHazards) ? analysis.visibleHazards.slice(0, 8) : [];
-  analysis.urgencyIndicators = Array.isArray(analysis.urgencyIndicators) ? analysis.urgencyIndicators.slice(0, 8) : [];
+  const analysis = sanitizeAnalysis(data.analysis, category, priority);
 
   const privateReport = {
-    ...data,
     description,
     category,
+    priority,
+    location: {
+      latitude: data.location.latitude,
+      longitude: data.location.longitude,
+    },
     analysis,
     imageUrl: null,
     status: "pending",
@@ -110,7 +159,6 @@ export async function addReport(data) {
     afterImageUrl: "",
     resolvedAt: null,
     archivedAt: null,
-    priority,
     createdAt,
   };
 
@@ -179,7 +227,7 @@ export async function assignReport(id, assignment) {
     assignedDepartment: assignment.department,
     assignedOfficer: assignment.officer,
     priority: assignment.priority,
-    assignedBy: assignment.assignedBy,
+    assignedBy: auth?.currentUser?.email || "",
     assignedAt: serverTimestamp(),
   });
   batch.set(doc(database, "publicReports", id), { status: "assigned", priority: assignment.priority }, { merge: true });
@@ -192,7 +240,7 @@ export async function resolveReport(id, resolution) {
   const batch = writeBatch(database);
   batch.update(doc(database, "reports", id), {
     status: "resolved",
-    resolvedBy: resolution.resolvedBy,
+    resolvedBy: auth?.currentUser?.email || "",
     resolutionNotes: resolution.resolutionNotes,
     afterImageUrl: resolution.afterImageUrl,
     resolvedAt,
@@ -210,67 +258,6 @@ export async function archiveReport(id) {
   });
   batch.set(doc(database, "publicReports", id), { status: "archived" }, { merge: true });
   await batch.commit();
-}
-
-export async function updateReportStatus(id, status) {
-  const database = requireDatabase();
-  const batch = writeBatch(database);
-  batch.update(doc(database, "reports", id), { status });
-  batch.set(doc(database, "publicReports", id), { status }, { merge: true });
-  await batch.commit();
-}
-
-export async function seedLifecycleDemoData() {
-  const database = requireDatabase();
-  const ownerEmail = String(import.meta.env.VITE_AUTHORITY_EMAIL || "").trim().toLowerCase();
-  const currentUser = auth?.currentUser;
-
-  if (!currentUser?.emailVerified || currentUser.email?.toLowerCase() !== ownerEmail) {
-    throw new Error("Only the verified bootstrap owner can load the demonstration dataset.");
-  }
-
-  const reports = buildLifecycleDemoReports();
-  const existing = await Promise.all(
-    reports.map((report) => getDoc(doc(database, "reports", report.id))),
-  );
-  const existingCount = existing.filter((snapshot) => snapshot.exists()).length;
-
-  if (existingCount > 0 && existingCount !== reports.length) {
-    throw new Error("The demonstration dataset is only partially present. No records were changed.");
-  }
-
-  if (existingCount === reports.length) {
-    const containsOnlyDemoRecords = existing.every((snapshot) =>
-      String(snapshot.data()?.description || "").startsWith(DEMO_PREFIX),
-    );
-    if (!containsOnlyDemoRecords) {
-      throw new Error("A demonstration document ID is already used by another report.");
-    }
-  } else {
-    const createBatch = writeBatch(database);
-    for (const report of reports) {
-      createBatch.set(doc(database, "reports", report.id), report.privateReport);
-      createBatch.set(doc(database, "publicReports", report.id), report.publicReport);
-    }
-    await createBatch.commit();
-  }
-
-  const lifecycleBatch = writeBatch(database);
-  for (const report of reports) {
-    lifecycleBatch.update(doc(database, "reports", report.id), report.lifecycle);
-    lifecycleBatch.set(
-      doc(database, "publicReports", report.id),
-      { status: report.status, priority: report.privateReport.priority },
-      { merge: true },
-    );
-  }
-  await lifecycleBatch.commit();
-
-  return {
-    added: existingCount === 0 ? reports.length : 0,
-    total: reports.length,
-    finished: reports.filter((report) => ["resolved", "archived"].includes(report.status)).length,
-  };
 }
 
 export async function getAuthorityProfile(uid) {

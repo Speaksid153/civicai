@@ -2,15 +2,20 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isVerifiedOwner() {
+    function isVerifiedIdentity() {
       return request.auth != null
-        && request.auth.token.email == 'rsiddharth499@gmail.com'
+        && request.auth.token.email is string
         && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner() {
+      return isVerifiedIdentity()
+        && request.auth.token.email == 'rsiddharth499@gmail.com';
     }
 
     function isAuthority() {
       return isVerifiedOwner()
-        || (request.auth != null
+        || (isVerifiedIdentity()
         && exists(/databases/$(database)/documents/authorities/$(request.auth.uid))
         && get(/databases/$(database)/documents/authorities/$(request.auth.uid)).data.active == true);
     }
@@ -38,8 +43,102 @@ service cloud.firestore {
         && value.longitude <= 180;
     }
 
+    function validDuplicate(value) {
+      return value is map
+        && value.keys().hasAll(['reportId', 'similarityScore', 'suggestion'])
+        && value.keys().hasOnly(['reportId', 'similarityScore', 'suggestion'])
+        && value.reportId is string
+        && value.reportId.size() >= 1
+        && value.reportId.size() <= 128
+        && value.similarityScore is number
+        && value.similarityScore >= 0
+        && value.similarityScore <= 100
+        && value.suggestion is string
+        && value.suggestion.size() >= 1
+        && value.suggestion.size() <= 240;
+    }
+
+    function validDuplicates(value) {
+      return value is list
+        && value.size() <= 3
+        && (value.size() < 1 || validDuplicate(value[0]))
+        && (value.size() < 2 || validDuplicate(value[1]))
+        && (value.size() < 3 || validDuplicate(value[2]));
+    }
+
+    function validAnalysis(value, category, priority) {
+      return value is map
+        && value.keys().hasAll([
+          'duplicates', 'isLikelyDuplicate', 'recommendation', 'category', 'department',
+          'confidence', 'priority', 'summary', 'imageDescriptionAlignment',
+          'authenticityAssessment', 'visibleHazards', 'severityEstimate',
+          'priorityExplanation', 'recommendedDepartment', 'urgencyIndicators',
+          'matchSignals', 'engine', 'finalCategory', 'finalPriority', 'userOverride',
+          'userJustification', 'suggestedCategory', 'suggestedDepartment', 'suggestedPriority'
+        ])
+        && value.keys().hasOnly([
+          'duplicates', 'isLikelyDuplicate', 'recommendation', 'category', 'department',
+          'confidence', 'priority', 'summary', 'imageDescriptionAlignment',
+          'authenticityAssessment', 'visibleHazards', 'severityEstimate',
+          'priorityExplanation', 'recommendedDepartment', 'urgencyIndicators',
+          'matchSignals', 'engine', 'finalCategory', 'finalPriority', 'userOverride',
+          'userJustification', 'suggestedCategory', 'suggestedDepartment', 'suggestedPriority'
+        ])
+        && validDuplicates(value.duplicates)
+        && value.isLikelyDuplicate is bool
+        && value.recommendation is string
+        && value.recommendation.size() >= 1
+        && value.recommendation.size() <= 160
+        && value.category == category
+        && value.finalCategory == category
+        && validCategory(value.suggestedCategory)
+        && value.department is string
+        && value.department.size() >= 1
+        && value.department.size() <= 120
+        && value.suggestedDepartment is string
+        && value.suggestedDepartment.size() >= 1
+        && value.suggestedDepartment.size() <= 120
+        && value.recommendedDepartment is string
+        && value.recommendedDepartment.size() >= 1
+        && value.recommendedDepartment.size() <= 120
+        && value.priority == priority
+        && value.finalPriority == priority
+        && validPriority(value.suggestedPriority)
+        && value.confidence is number
+        && value.confidence >= 0
+        && value.confidence <= 100
+        && value.summary is string
+        && value.summary.size() >= 1
+        && value.summary.size() <= 500
+        && value.imageDescriptionAlignment is string
+        && value.imageDescriptionAlignment.size() <= 120
+        && value.authenticityAssessment is string
+        && value.authenticityAssessment.size() <= 120
+        && value.visibleHazards is list
+        && value.visibleHazards.size() <= 8
+        && value.severityEstimate is string
+        && value.severityEstimate.size() <= 32
+        && value.priorityExplanation is string
+        && value.priorityExplanation.size() <= 500
+        && value.urgencyIndicators is list
+        && value.urgencyIndicators.size() <= 8
+        && value.matchSignals is list
+        && value.matchSignals.size() <= 24
+        && value.engine is string
+        && value.engine.size() >= 1
+        && value.engine.size() <= 64
+        && value.userOverride is bool
+        && value.userJustification is string
+        && value.userJustification.size() <= 500;
+    }
+
     function validCitizenReport() {
-      return request.resource.data.keys().hasOnly([
+      return request.resource.data.keys().hasAll([
+          'description', 'category', 'priority', 'location', 'imageUrl', 'analysis',
+          'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
+          'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
           'description', 'category', 'priority', 'location', 'imageUrl', 'analysis',
           'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
           'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt', 'createdAt'
@@ -50,19 +149,12 @@ service cloud.firestore {
         && validCategory(request.resource.data.category)
         && validPriority(request.resource.data.priority)
         && request.resource.data.status == 'pending'
-        && request.resource.data.analysis is map
-        && request.resource.data.analysis.category == request.resource.data.category
-        && request.resource.data.analysis.priority == request.resource.data.priority
-        && request.resource.data.analysis.department is string
-        && request.resource.data.analysis.department.size() <= 120
-        && request.resource.data.analysis.summary is string
-        && request.resource.data.analysis.summary.size() <= 500
-        && request.resource.data.analysis.confidence is number
-        && request.resource.data.analysis.confidence >= 0
-        && request.resource.data.analysis.confidence <= 100
-        && request.resource.data.analysis.matchSignals is list
-        && request.resource.data.analysis.matchSignals.size() <= 24
-        && request.resource.data.createdAt is timestamp
+        && validAnalysis(
+          request.resource.data.analysis,
+          request.resource.data.category,
+          request.resource.data.priority
+        )
+        && request.resource.data.createdAt == request.time
         && request.resource.data.assignedDepartment == ''
         && request.resource.data.assignedOfficer == ''
         && request.resource.data.assignedBy == ''
@@ -76,37 +168,65 @@ service cloud.firestore {
         && validLocation(request.resource.data.location);
     }
 
+    function validAssignmentTransition() {
+      return resource.data.status == 'pending'
+        && request.resource.data.status == 'assigned'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'priority', 'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt'
+        ])
+        && validPriority(request.resource.data.priority)
+        && request.resource.data.assignedDepartment is string
+        && request.resource.data.assignedDepartment.size() >= 1
+        && request.resource.data.assignedDepartment.size() <= 120
+        && request.resource.data.assignedOfficer is string
+        && request.resource.data.assignedOfficer.size() >= 1
+        && request.resource.data.assignedOfficer.size() <= 120
+        && request.resource.data.assignedBy == request.auth.token.email
+        && request.resource.data.assignedAt == request.time;
+    }
+
+    function validResolutionTransition() {
+      return resource.data.status == 'assigned'
+        && request.resource.data.status == 'resolved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt'
+        ])
+        && request.resource.data.resolvedBy == request.auth.token.email
+        && request.resource.data.resolutionNotes is string
+        && request.resource.data.resolutionNotes.size() >= 1
+        && request.resource.data.resolutionNotes.size() <= 2000
+        && request.resource.data.afterImageUrl is string
+        && request.resource.data.afterImageUrl.size() <= 2048
+        && (request.resource.data.afterImageUrl == ''
+          || request.resource.data.afterImageUrl.matches('^https?://[^\\s]+$'))
+        && request.resource.data.resolvedAt is timestamp
+        && request.resource.data.resolvedAt >= resource.data.assignedAt
+        && request.resource.data.resolvedAt <= request.time;
+    }
+
+    function validArchiveTransition() {
+      return resource.data.status == 'resolved'
+        && request.resource.data.status == 'archived'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'archivedAt'])
+        && request.resource.data.archivedAt == request.time;
+    }
+
     function validAuthorityReportUpdate() {
       return request.resource.data.keys().hasOnly([
           'description', 'category', 'priority', 'location', 'imageUrl', 'analysis',
           'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
           'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt', 'createdAt'
         ])
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'priority', 'status', 'assignedDepartment', 'assignedOfficer', 'assignedBy', 'assignedAt',
-          'resolvedBy', 'resolutionNotes', 'afterImageUrl', 'resolvedAt', 'archivedAt'
-        ])
-        && validPriority(request.resource.data.priority)
-        && validStatus(request.resource.data.status)
-        && request.resource.data.assignedDepartment is string
-        && request.resource.data.assignedDepartment.size() <= 120
-        && request.resource.data.assignedOfficer is string
-        && request.resource.data.assignedOfficer.size() <= 120
-        && request.resource.data.assignedBy is string
-        && request.resource.data.assignedBy.size() <= 320
-        && (request.resource.data.assignedAt == null || request.resource.data.assignedAt is timestamp)
-        && request.resource.data.resolvedBy is string
-        && request.resource.data.resolvedBy.size() <= 120
-        && request.resource.data.resolutionNotes is string
-        && request.resource.data.resolutionNotes.size() <= 2000
-        && request.resource.data.afterImageUrl is string
-        && request.resource.data.afterImageUrl.size() <= 2048
-        && (request.resource.data.resolvedAt == null || request.resource.data.resolvedAt is timestamp)
-        && (request.resource.data.archivedAt == null || request.resource.data.archivedAt is timestamp);
+        && (validAssignmentTransition()
+          || validResolutionTransition()
+          || validArchiveTransition());
     }
 
     function validPublicReport(value) {
-      return value.keys().hasOnly([
+      return value.keys().hasAll([
+          'category', 'status', 'priority', 'location', 'matchSignals', 'createdAt'
+        ])
+        && value.keys().hasOnly([
           'category', 'status', 'priority', 'location', 'matchSignals', 'createdAt'
         ])
         && validCategory(value.category)
@@ -127,7 +247,7 @@ service cloud.firestore {
     }
 
     match /authorities/{userId} {
-      allow read: if request.auth != null
+      allow read: if isVerifiedIdentity()
         && (request.auth.uid == userId || isVerifiedOwner());
       allow write: if false;
     }
@@ -143,12 +263,17 @@ service cloud.firestore {
       allow read: if true;
       allow create: if validPublicReport(request.resource.data)
         && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
         && publicMatchesPrivate(reportId);
       allow update: if isAuthority()
         && validPublicReport(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'priority'])
         && publicMatchesPrivate(reportId);
       allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

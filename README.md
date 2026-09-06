@@ -18,11 +18,13 @@ Classification, priority suggestions, hazard flags, duplicate scoring, operation
 - Firebase web configuration is public application metadata, not a server secret. Security must come from Firestore Rules, authorized domains, App Check, quotas, and monitoring.
 - Full reports and exact coordinates are stored in the private `reports` collection.
 - The public dashboard reads sanitized records from `publicReports`, which contain a coarse location and no free-text description.
-- Authority access uses a one-time Firebase email sign-in link. The verified bootstrap owner is checked in both Firestore Rules and the client route.
+- Authority access uses a one-time Firebase email sign-in link. Every authority must have a verified email; the bootstrap owner is checked in both Firestore Rules and the client route.
 - Public self-registration for authority accounts has been removed.
-- `firestore.rules` denies public reads of private reports and denies deletes.
+- `firestore.rules` denies public reads of private reports and all deletes, validates the complete citizen payload, and permits only `pending → assigned → resolved → archived` authority transitions.
+- Assignment and resolution actor fields are derived from Firebase Authentication and cannot be supplied as another identity.
+- The web client supports Firebase App Check with reCAPTCHA Enterprise through `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 
-Before production, enable Firebase App Check and set budget/usage alerts. Client-only code cannot reliably rate-limit anonymous abuse.
+App Check enforcement and budget/usage alerts are cloud-console controls and must be enabled in the Firebase project before accepting untrusted public traffic. Client-only code cannot reliably rate-limit a determined anonymous attacker, so a high-volume municipal deployment should put report creation behind a trusted API with durable rate limiting.
 
 ## Local setup
 
@@ -40,6 +42,7 @@ Set these public Firebase web configuration values in `.env` and in the hosting 
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_APPCHECK_SITE_KEY` (reCAPTCHA Enterprise score-based site key)
 - `VITE_AUTHORITY_EMAIL` (must match the verified bootstrap owner in `firestore.rules`)
 
 No Gemini, Groq, OpenAI, or other chatbot token is used.
@@ -60,7 +63,7 @@ The production login currently sends links only to the configured bootstrap owne
 }
 ```
 
-Deploy `firestore.rules` using the Firebase CLI or Firebase console after any authorization-policy changes.
+Deploy `firestore.rules` using the Firebase CLI or Firebase console after any authorization-policy changes. Enable Firestore enforcement only after the App Check request metrics show legitimate production traffic receiving valid tokens.
 
 Never rely on the frontend email comparison by itself. The deployed `firestore.rules` independently checks the signed, verified Firebase identity before granting access.
 
@@ -71,6 +74,8 @@ npm run dev       # local development
 npm run build     # production build
 npm run lint      # static checks
 npm test          # local rules-engine tests
+npm run test:rules # Firestore emulator authorization tests (requires Java 21+)
+npm run test:all   # unit and Firestore rules tests
 ```
 
 ## Main stack
@@ -83,7 +88,7 @@ npm test          # local rules-engine tests
 ## Known operational work
 
 - Existing private reports need a one-time migration into sanitized `publicReports` documents if they should appear on the public activity view.
-- Firebase App Check and platform-level rate limiting must be enabled in the deployed Firebase project.
+- Firebase App Check enforcement, budget alerts, and platform-level rate limiting must be configured in the deployed Firebase project.
 - Authority membership documents must be administered outside the public client.
 
 Licensed under the MIT License.

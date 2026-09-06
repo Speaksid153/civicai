@@ -190,7 +190,7 @@ export default function ReportCard({
           </button>
         )}
 
-        {report.status !== "resolved" && report.status !== "archived" && onResolve && (
+        {report.status === "assigned" && onResolve && (
           <button
             onClick={(event) => {
               event.stopPropagation();
