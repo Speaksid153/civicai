@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MapView from "../components/MapView";
 import ReportDrawer from "../components/ReportDrawer";
+import DemoDataNotice from "../components/DemoDataNotice";
 import { getPublicReports, isFirebaseConfigured } from "../services/firebase";
-import { getResolutionRate } from "../utils/analytics";
+import { getResolutionRate, isSyntheticReport } from "../utils/analytics";
 import { formatTimestamp } from "../utils/reports";
 
 export default function CitizenHub() {
@@ -18,7 +19,7 @@ export default function CitizenHub() {
   const mapSectionRef = useRef(null);
 
   // New Live Data State
-  const [stats, setStats] = useState({ total: 0, pending: 0, resolutionRate: 0 });
+  const [stats, setStats] = useState({ total: 0, pending: 0, resolutionRate: 0, demoCount: 0 });
   const [recentReports, setRecentReports] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [dataError, setDataError] = useState("");
@@ -34,7 +35,12 @@ export default function CitizenHub() {
         const pending = data.filter((r) => r.status === "pending").length;
         const resolutionRate = getResolutionRate(data);
         
-        setStats({ total, pending, resolutionRate });
+        setStats({
+          total,
+          pending,
+          resolutionRate,
+          demoCount: data.filter(isSyntheticReport).length,
+        });
         
         // Slice top 5 most recent reports (already sorted by createdAt desc)
         setRecentReports(data.slice(0, 5));
@@ -90,6 +96,7 @@ export default function CitizenHub() {
         total: data.length,
         pending: data.filter((r) => r.status === "pending").length,
         resolutionRate: getResolutionRate(data),
+        demoCount: data.filter(isSyntheticReport).length,
       });
       setRecentReports(data.slice(0, 5));
     }).catch(() => setDataError("The report was saved, but the public activity feed could not be refreshed."));
@@ -168,6 +175,7 @@ export default function CitizenHub() {
             <p className="ds-body" style={{ margin: 0 }}>{dataError}</p>
           </div>
         )}
+        <DemoDataNotice reports={recentReports} total={stats.total} demoCount={stats.demoCount} />
         
         {loadingData ? (
           <div className="ds-grid-cards">
@@ -186,7 +194,9 @@ export default function CitizenHub() {
               <p style={{ fontSize: "48px", fontWeight: "var(--font-weight-bold)", color: "var(--color-amber)", margin: "8px 0 0" }}>{stats.pending}</p>
             </div>
             <div className="ds-card ds-page-enter" style={{ animationDelay: "150ms", textAlign: "center" }}>
-              <p className="ds-label">RESOLUTION RATE</p>
+              <p className="ds-label">
+                {stats.demoCount > 0 ? "DEMO-INCLUSIVE RESOLUTION RATE" : "RESOLUTION RATE"}
+              </p>
               <p style={{ fontSize: "48px", fontWeight: "var(--font-weight-bold)", color: "var(--color-teal)", margin: "8px 0 0" }}>{stats.resolutionRate}%</p>
             </div>
           </div>
@@ -205,6 +215,7 @@ export default function CitizenHub() {
                   <div className="ds-flex-center" style={{ gap: "8px" }}>
                     <span className="ds-chip">{report.category}</span>
                     <span className={`ds-badge ds-badge-${report.status || "pending"}`}>{String(report.status || "pending").toUpperCase()}</span>
+                    {isSyntheticReport(report) && <span className="ds-badge ds-badge-assigned">DEMO</span>}
                   </div>
                   <span className="ds-label ds-secondary">
                     {formatTimestamp(report.createdAt)}

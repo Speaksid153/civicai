@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AuthorityNav from "../components/AuthorityNav";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import Toast from "../components/Toast";
+import DemoDataNotice from "../components/DemoDataNotice";
 import { buildOperationalInsights } from "../services/civicIntelligence";
 import { observeAuth } from "../services/auth";
 import { getReports } from "../services/firebase";
@@ -65,6 +66,7 @@ export default function AIInsightsDashboard() {
         </header>
 
         <main className="ds-container" style={{ paddingBlock: "32px" }}>
+          <DemoDataNotice reports={reports} />
           {loading ? <LoadingSkeleton /> : (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <section className="ds-card ds-shadow-card">

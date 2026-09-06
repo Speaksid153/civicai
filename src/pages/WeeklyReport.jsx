@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AuthorityNav from "../components/AuthorityNav";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import Toast from "../components/Toast";
+import DemoDataNotice from "../components/DemoDataNotice";
 import { observeAuth } from "../services/auth";
 import { buildWeeklyReport } from "../services/civicIntelligence";
 import { getReports } from "../services/firebase";
@@ -72,6 +73,7 @@ export default function WeeklyReport() {
         </header>
 
         <main className="ds-container" style={{ paddingBlock: "32px", maxWidth: "980px" }}>
+          <DemoDataNotice reports={weeklyReports} />
           <div className="ds-flex-between" style={{ marginBottom: "24px", gap: "16px", flexWrap: "wrap" }}>
             <label className="ds-input-label" htmlFor="week-select">Reporting period</label>
             <select id="week-select" className="ds-select" value={selectedWeek} onChange={(event) => setSelectedWeek(event.target.value)} style={{ maxWidth: "320px" }}>

@@ -1,4 +1,5 @@
 import { formatTimestamp } from "../utils/reports";
+import { isSyntheticReport } from "../utils/analytics";
 
 function safeExternalUrl(value) {
   try {
@@ -56,6 +57,9 @@ export default function ReportCard({
         <span className={`ds-badge ${statusMap[report.status] || "ds-badge-archived"}`}>
           {String(report.status || "pending").toUpperCase()}
         </span>
+        {isSyntheticReport(report) && (
+          <span className="ds-badge ds-badge-assigned">DEMO</span>
+        )}
         {report.priority && (
           <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "var(--font-weight-medium)" }} className={priorityMap[report.priority] || ""}>
             <span className={`ds-priority-dot ${priorityDotMap[report.priority] || ""}`}></span>

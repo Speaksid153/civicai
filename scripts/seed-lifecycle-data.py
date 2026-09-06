@@ -226,7 +226,7 @@ def generate_reports() -> list[dict]:
                 "priority": priority,
                 "status": status,
                 "location": (latitude, longitude),
-                "signals": signals + [area.lower()],
+                "signals": signals + [area.lower(), "synthetic-demo"],
                 "officer": officer,
                 "resolution": config["resolutions"][index % len(config["resolutions"])],
                 "created_at": created_at,

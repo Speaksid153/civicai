@@ -9,6 +9,7 @@ import ResolutionModal from "../components/ResolutionModal";
 import Toast from "../components/Toast";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import AuthorityNav from "../components/AuthorityNav";
+import DemoDataNotice from "../components/DemoDataNotice";
 
 import {
   getReports,
@@ -230,6 +231,7 @@ export default function AuthorityDashboard() {
 
         {/* Dashboard Content */}
         <main style={{ flex: 1, padding: "32px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+          <DemoDataNotice reports={reports} />
           <DashboardStats
             total={reports.length}
             pending={pending.length}

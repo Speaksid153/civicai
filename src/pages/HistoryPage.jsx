@@ -7,6 +7,7 @@ import Toast from "../components/Toast";
 
 import { getArchivedReports } from "../services/firebase";
 import AuthorityNav from "../components/AuthorityNav";
+import DemoDataNotice from "../components/DemoDataNotice";
 import { getCurrentUser } from "../services/auth";
 import {
   formatDateInput,
@@ -136,6 +137,7 @@ export default function HistoryPage() {
         </header>
 
         <main style={{ flex: 1, padding: "32px" }}>
+          <DemoDataNotice reports={reports} />
           {/* Filter Bar */}
           <div className="ds-card ds-shadow-card" style={{ marginBottom: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>

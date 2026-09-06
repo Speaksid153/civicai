@@ -90,7 +90,7 @@ function buildReport(sample, index) {
     priority,
     summary: `Synthetic ${category.toLowerCase()} example routed by transparent local rules.`,
     confidence: 90,
-    matchSignals,
+    matchSignals: [...matchSignals, "synthetic-demo"],
   };
 
   return {
@@ -118,7 +118,7 @@ function buildReport(sample, index) {
       priority,
       status: "pending",
       location: { latitude, longitude },
-      matchSignals,
+      matchSignals: analysis.matchSignals,
       createdAt,
     },
   };

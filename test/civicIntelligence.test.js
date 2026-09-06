@@ -6,6 +6,7 @@ import {
   buildOperationalInsights,
   buildWeeklyReport,
 } from "../src/services/civicIntelligence.js";
+import { getResolutionRate, isSyntheticReport } from "../src/utils/analytics.js";
 
 test("routes common civic descriptions without a remote model", () => {
   const road = analyzeReport("A deep pothole is blocking traffic outside the school");
@@ -96,4 +97,19 @@ test("weekly peak intake uses submission day, not resolution day", () => {
 
   const weekly = buildWeeklyReport(reports, "9–15 Aug 2026");
   assert.equal(weekly.trends[0].change, "1 report on 2026-08-10");
+});
+
+test("labels demo records and calculates the planned proof dataset honestly", () => {
+  assert.equal(isSyntheticReport({ matchSignals: ["synthetic-demo"] }), true);
+  assert.equal(isSyntheticReport({ description: "[SYNTHETIC DEMO — NOT A REAL COMPLAINT] Example" }), true);
+  assert.equal(isSyntheticReport({ matchSignals: ["a1b2c3d4"] }), false);
+
+  const reports = [
+    ...Array.from({ length: 15 }, () => ({ status: "pending" })),
+    ...Array.from({ length: 12 }, () => ({ status: "assigned" })),
+    ...Array.from({ length: 20 }, () => ({ status: "resolved" })),
+    ...Array.from({ length: 13 }, () => ({ status: "archived" })),
+  ];
+
+  assert.equal(getResolutionRate(reports), 55);
 });

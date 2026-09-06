@@ -103,3 +103,26 @@ export function getResolutionRate(reports) {
 
   return Math.round((finished / reports.length) * 100);
 }
+
+const syntheticDescriptionPrefix = "[SYNTHETIC DEMO";
+const syntheticSignal = "synthetic-demo";
+
+export function isSyntheticReport(report) {
+  if (!report) return false;
+
+  if (report.isSynthetic === true) return true;
+  if (String(report.description || "").startsWith(syntheticDescriptionPrefix)) return true;
+  if (String(report.analysis?.summary || "").startsWith("Synthetic ")) return true;
+
+  const signals = Array.isArray(report.matchSignals)
+    ? report.matchSignals
+    : report.analysis?.matchSignals;
+
+  if (!Array.isArray(signals)) return false;
+  if (signals.includes(syntheticSignal)) return true;
+
+  // The original 12 proof records predate the explicit marker and contain
+  // readable match terms. Real reports created by the current app store only
+  // eight-character privacy hashes, so this safely identifies that legacy set.
+  return signals.length > 0 && signals.some((signal) => !/^[a-f0-9]{8}$/i.test(String(signal)));
+}
