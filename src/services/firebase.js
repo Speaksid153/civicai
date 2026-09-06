@@ -13,6 +13,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { buildLifecycleDemoReports, DEMO_PREFIX } from "./demoLifecycleData";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -217,6 +218,59 @@ export async function updateReportStatus(id, status) {
   batch.update(doc(database, "reports", id), { status });
   batch.set(doc(database, "publicReports", id), { status }, { merge: true });
   await batch.commit();
+}
+
+export async function seedLifecycleDemoData() {
+  const database = requireDatabase();
+  const ownerEmail = String(import.meta.env.VITE_AUTHORITY_EMAIL || "").trim().toLowerCase();
+  const currentUser = auth?.currentUser;
+
+  if (!currentUser?.emailVerified || currentUser.email?.toLowerCase() !== ownerEmail) {
+    throw new Error("Only the verified bootstrap owner can load the demonstration dataset.");
+  }
+
+  const reports = buildLifecycleDemoReports();
+  const existing = await Promise.all(
+    reports.map((report) => getDoc(doc(database, "reports", report.id))),
+  );
+  const existingCount = existing.filter((snapshot) => snapshot.exists()).length;
+
+  if (existingCount > 0 && existingCount !== reports.length) {
+    throw new Error("The demonstration dataset is only partially present. No records were changed.");
+  }
+
+  if (existingCount === reports.length) {
+    const containsOnlyDemoRecords = existing.every((snapshot) =>
+      String(snapshot.data()?.description || "").startsWith(DEMO_PREFIX),
+    );
+    if (!containsOnlyDemoRecords) {
+      throw new Error("A demonstration document ID is already used by another report.");
+    }
+  } else {
+    const createBatch = writeBatch(database);
+    for (const report of reports) {
+      createBatch.set(doc(database, "reports", report.id), report.privateReport);
+      createBatch.set(doc(database, "publicReports", report.id), report.publicReport);
+    }
+    await createBatch.commit();
+  }
+
+  const lifecycleBatch = writeBatch(database);
+  for (const report of reports) {
+    lifecycleBatch.update(doc(database, "reports", report.id), report.lifecycle);
+    lifecycleBatch.set(
+      doc(database, "publicReports", report.id),
+      { status: report.status, priority: report.privateReport.priority },
+      { merge: true },
+    );
+  }
+  await lifecycleBatch.commit();
+
+  return {
+    added: existingCount === 0 ? reports.length : 0,
+    total: reports.length,
+    finished: reports.filter((report) => ["resolved", "archived"].includes(report.status)).length,
+  };
 }
 
 export async function getAuthorityProfile(uid) {

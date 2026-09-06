@@ -16,6 +16,7 @@ import {
   assignReport,
   resolveReport,
   archiveReport,
+  seedLifecycleDemoData,
 } from "../services/firebase";
 
 import {
@@ -27,6 +28,7 @@ import {
   formatDuration,
   getAverageResolutionTime,
   getResolutionRate,
+  isSyntheticReport,
 } from "../utils/analytics";
 
 export default function AuthorityDashboard() {
@@ -36,6 +38,7 @@ export default function AuthorityDashboard() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
   const [activeTab, setActiveTab] = useState("pending");
+  const [seedingDemo, setSeedingDemo] = useState(false);
 
   const [selectedReport, setSelectedReport] =
     useState(null);
@@ -137,6 +140,22 @@ export default function AuthorityDashboard() {
     }
   }
 
+  async function handleSeedDemo() {
+    if (!window.confirm("Load 48 clearly labelled synthetic lifecycle records? This will make the demo-inclusive resolution rate 55%.")) return;
+
+    try {
+      setSeedingDemo(true);
+      await seedLifecycleDemoData();
+      await loadReports();
+      showToast("Proof dataset loaded. The demo-inclusive resolution rate is now 55%.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Unable to load the proof dataset.", "error");
+    } finally {
+      setSeedingDemo(false);
+    }
+  }
+
 
   if (!user) {
     return (
@@ -166,6 +185,9 @@ export default function AuthorityDashboard() {
   );
 
   const resolutionRate = getResolutionRate(reports);
+  const demoCount = reports.filter(isSyntheticReport).length;
+  const demoLifecycleLoaded = reports.some((report) => report.id.startsWith("synthetic-lifecycle-v3-"));
+  const isBootstrapOwner = user.email?.toLowerCase() === String(import.meta.env.VITE_AUTHORITY_EMAIL || "").trim().toLowerCase();
   const averageResolutionTime = formatDuration(
     getAverageResolutionTime(reports)
   );
@@ -232,6 +254,19 @@ export default function AuthorityDashboard() {
         {/* Dashboard Content */}
         <main style={{ flex: 1, padding: "32px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           <DemoDataNotice reports={reports} />
+          {isBootstrapOwner && !demoLifecycleLoaded && !loading && (
+            <section className="ds-card ds-shadow-card" style={{ marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+              <div>
+                <p className="ds-label" style={{ color: "var(--color-primary)", marginBottom: "6px" }}>PROOF DATASET</p>
+                <p className="ds-body" style={{ margin: 0 }}>
+                  Add 48 synthetic lifecycle cases to the existing {demoCount} examples, including assignments, resolutions, archive history, officers, timestamps, and resolution notes.
+                </p>
+              </div>
+              <button className="ds-btn ds-btn-primary" onClick={handleSeedDemo} disabled={seedingDemo}>
+                {seedingDemo ? "Loading demo records..." : "Load 55% proof dataset"}
+              </button>
+            </section>
+          )}
           <DashboardStats
             total={reports.length}
             pending={pending.length}

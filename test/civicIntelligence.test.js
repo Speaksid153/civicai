@@ -7,6 +7,7 @@ import {
   buildWeeklyReport,
 } from "../src/services/civicIntelligence.js";
 import { getResolutionRate, isSyntheticReport } from "../src/utils/analytics.js";
+import { buildLifecycleDemoReports } from "../src/services/demoLifecycleData.js";
 
 test("routes common civic descriptions without a remote model", () => {
   const road = analyzeReport("A deep pothole is blocking traffic outside the school");
@@ -112,4 +113,10 @@ test("labels demo records and calculates the planned proof dataset honestly", ()
   ];
 
   assert.equal(getResolutionRate(reports), 55);
+
+  const lifecycle = buildLifecycleDemoReports(new Date("2026-09-06T12:00:00Z"));
+  assert.equal(lifecycle.length, 48);
+  assert.equal(lifecycle.filter((item) => item.status === "resolved").length, 20);
+  assert.equal(lifecycle.filter((item) => item.status === "archived").length, 13);
+  assert.ok(lifecycle.every((item) => item.privateReport.description.startsWith("[SYNTHETIC DEMO")));
 });
