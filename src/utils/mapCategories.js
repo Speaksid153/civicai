@@ -10,3 +10,17 @@ export const categoryMarkerStyles = {
 export function getCategoryMarkerStyle(category) {
   return categoryMarkerStyles[category] || categoryMarkerStyles.Other;
 }
+
+const departmentCategories = {
+  "BBMP Roads": "Road",
+  "BBMP Sanitation": "Garbage",
+  BWSSB: "Water",
+  BESCOM: "Electricity",
+  "BBMP Drainage": "Drainage",
+  "BBMP Citizen Services": "Other",
+  "Traffic Police": "Road",
+};
+
+export function getDepartmentMarkerStyle(department) {
+  return getCategoryMarkerStyle(departmentCategories[department] || "Other");
+}

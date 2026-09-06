@@ -7,6 +7,7 @@ import { buildOperationalInsights } from "../services/civicIntelligence";
 import { observeAuth } from "../services/auth";
 import { getReports } from "../services/firebase";
 import { getReportsByCategory } from "../utils/analytics";
+import { getDepartmentMarkerStyle } from "../utils/mapCategories";
 
 function getAnalysis(report) {
   return report.analysis || report.ai || null;
@@ -122,16 +123,39 @@ export default function AIInsightsDashboard() {
               </div>
 
               <section className="ds-card">
-                <h2 className="ds-title">Department workload</h2>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead><tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-divider)" }}><th style={{ padding: "12px" }}>Department</th><th>Load</th><th>Average resolution</th><th>Action</th></tr></thead>
-                    <tbody>{insights.departmentInsights.map((item) => (
-                      <tr key={item.department} style={{ borderBottom: "1px solid var(--color-divider)" }}>
-                        <td style={{ padding: "12px" }}><strong>{item.department}</strong></td><td>{item.workload}</td><td>{item.avgResolutionTime}</td><td>{item.suggestion}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
+                <div style={{ marginBottom: "20px" }}>
+                  <h2 className="ds-title" style={{ marginBottom: "4px" }}>Department workload</h2>
+                  <p className="ds-body ds-secondary" style={{ margin: 0 }}>A compact view of load, turnaround, and the next operational check.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+                  {insights.departmentInsights.map((item) => {
+                    const sectorStyle = getDepartmentMarkerStyle(item.department);
+                    return (
+                      <article
+                        key={item.department}
+                        style={{
+                          padding: "18px",
+                          borderRadius: "var(--radius-card)",
+                          background: sectorStyle.background,
+                          border: `1px solid ${sectorStyle.color}30`,
+                        }}
+                      >
+                        <div className="ds-flex-between" style={{ gap: "12px", marginBottom: "16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: 0 }}>
+                            <span aria-hidden="true" style={{ width: "10px", height: "10px", borderRadius: "50%", background: sectorStyle.color, flexShrink: 0 }} />
+                            <h3 style={{ margin: 0, fontSize: "16px", color: sectorStyle.color }}>{item.department}</h3>
+                          </div>
+                          <span className="ds-chip" style={{ color: sectorStyle.color, borderColor: `${sectorStyle.color}55`, background: "rgba(255,255,255,0.55)" }}>
+                            {item.workload} load
+                          </span>
+                        </div>
+                        <p className="ds-label ds-secondary" style={{ marginBottom: "4px" }}>AVERAGE RESOLUTION</p>
+                        <p style={{ margin: "0 0 14px", fontSize: "24px", fontWeight: 700 }}>{item.avgResolutionTime}</p>
+                        <p className="ds-label ds-secondary" style={{ marginBottom: "4px" }}>NEXT CHECK</p>
+                        <p className="ds-body" style={{ margin: 0, fontSize: "14px", lineHeight: 1.5 }}>{item.suggestion}</p>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 

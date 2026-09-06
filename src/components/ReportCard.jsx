@@ -50,9 +50,9 @@ export default function ReportCard({
     <div
       onClick={() => onSelect?.(report)}
       className={`ds-card ds-shadow-card ${cardBorderClass}`}
-      style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: "16px", padding: "20px", transition: "var(--transition-hover)" }}
+      style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: "16px", padding: "20px", transition: "var(--transition-hover)", backgroundColor: categoryStyle.background }}
       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-bg-hover)"}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--color-bg-surface)"}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = categoryStyle.background}
     >
       {/* Tags & Status */}
       <div style={{ display: "flex", alignItems: "center", justifyItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>

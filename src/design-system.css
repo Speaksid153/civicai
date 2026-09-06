@@ -207,6 +207,7 @@ a:hover {
 
 /* Priority left-border accent (4px) */
 .ds-card-priority-high   { border-left: 4px solid var(--color-priority-high); }
+.ds-card-priority-critical { border-left: 5px solid var(--color-priority-high); }
 .ds-card-priority-medium { border-left: 4px solid var(--color-priority-medium); }
 .ds-card-priority-low    { border-left: 4px solid var(--color-priority-low); }
 

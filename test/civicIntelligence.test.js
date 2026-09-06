@@ -8,7 +8,7 @@ import {
 } from "../src/services/civicIntelligence.js";
 import { getResolutionRate, isSyntheticReport } from "../src/utils/analytics.js";
 import { buildLifecycleDemoReports } from "../src/services/demoLifecycleData.js";
-import { categoryMarkerStyles, getCategoryMarkerStyle } from "../src/utils/mapCategories.js";
+import { categoryMarkerStyles, getCategoryMarkerStyle, getDepartmentMarkerStyle } from "../src/utils/mapCategories.js";
 
 test("routes common civic descriptions without a remote model", () => {
   const road = analyzeReport("A deep pothole is blocking traffic outside the school");
@@ -139,4 +139,6 @@ test("uses a distinct map color for every civic category", () => {
   const colors = Object.values(categoryMarkerStyles).map((style) => style.color);
   assert.equal(new Set(colors).size, 6);
   assert.deepEqual(getCategoryMarkerStyle("Unknown"), categoryMarkerStyles.Other);
+  assert.deepEqual(getDepartmentMarkerStyle("BESCOM"), categoryMarkerStyles.Electricity);
+  assert.deepEqual(getDepartmentMarkerStyle("BBMP Roads"), categoryMarkerStyles.Road);
 });

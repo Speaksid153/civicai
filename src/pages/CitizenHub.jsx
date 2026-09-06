@@ -103,8 +103,8 @@ export default function CitizenHub() {
     }).catch(() => setDataError("The report was saved, but the public activity feed could not be refreshed."));
   };
 
-  const scrollToMap = () => {
-    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const openReportForm = () => {
+    setDrawerOpen(true);
   };
 
   // Helper for priority color accents on recent reports
@@ -147,7 +147,7 @@ export default function CitizenHub() {
           
           <div className="ds-flex-center" style={{ gap: "16px", flexWrap: "wrap" }}>
             <button
-              onClick={scrollToMap}
+              onClick={openReportForm}
               className="ds-btn ds-btn-pill-cta"
             >
               Report an Issue
@@ -211,7 +211,14 @@ export default function CitizenHub() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {recentReports.map((report, i) => (
-              <div key={report.id} className={`ds-card ${getPriorityClass(report.priority)} ds-stagger-item`} style={{ animationDelay: `${200 + i * 50}ms` }}>
+              <div
+                key={report.id}
+                className={`ds-card ${getPriorityClass(report.priority)} ds-stagger-item`}
+                style={{
+                  animationDelay: `${200 + i * 50}ms`,
+                  background: getCategoryMarkerStyle(report.category).background,
+                }}
+              >
                 <div className="ds-flex-between" style={{ marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div className="ds-flex-center" style={{ gap: "8px" }}>
                     <span
