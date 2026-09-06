@@ -214,10 +214,7 @@ export default function CitizenHub() {
               <div
                 key={report.id}
                 className={`ds-card ${getPriorityClass(report.priority)} ds-stagger-item`}
-                style={{
-                  animationDelay: `${200 + i * 50}ms`,
-                  background: getCategoryMarkerStyle(report.category).background,
-                }}
+                style={{ animationDelay: `${200 + i * 50}ms` }}
               >
                 <div className="ds-flex-between" style={{ marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div className="ds-flex-center" style={{ gap: "8px" }}>

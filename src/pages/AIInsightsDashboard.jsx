@@ -136,8 +136,9 @@ export default function AIInsightsDashboard() {
                         style={{
                           padding: "18px",
                           borderRadius: "var(--radius-card)",
-                          background: sectorStyle.background,
-                          border: `1px solid ${sectorStyle.color}30`,
+                          background: "var(--color-bg-surface)",
+                          border: "1px solid var(--color-divider)",
+                          borderLeft: `4px solid ${sectorStyle.color}`,
                         }}
                       >
                         <div className="ds-flex-between" style={{ gap: "12px", marginBottom: "16px" }}>
@@ -145,7 +146,7 @@ export default function AIInsightsDashboard() {
                             <span aria-hidden="true" style={{ width: "10px", height: "10px", borderRadius: "50%", background: sectorStyle.color, flexShrink: 0 }} />
                             <h3 style={{ margin: 0, fontSize: "16px", color: sectorStyle.color }}>{item.department}</h3>
                           </div>
-                          <span className="ds-chip" style={{ color: sectorStyle.color, borderColor: `${sectorStyle.color}55`, background: "rgba(255,255,255,0.55)" }}>
+                          <span className="ds-chip" style={{ color: sectorStyle.color, borderColor: `${sectorStyle.color}55` }}>
                             {item.workload} load
                           </span>
                         </div>
