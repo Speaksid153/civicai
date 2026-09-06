@@ -261,6 +261,9 @@ export default function AuthorityDashboard() {
                 <p className="ds-body" style={{ margin: 0 }}>
                   Add 48 synthetic lifecycle cases to the existing {demoCount} examples, including assignments, resolutions, archive history, officers, timestamps, and resolution notes.
                 </p>
+                <p className="ds-body ds-secondary" style={{ margin: "6px 0 0", fontSize: "13px" }}>
+                  Result: 60 total · 15 pending · 12 assigned · 20 resolved · 13 archived.
+                </p>
               </div>
               <button className="ds-btn ds-btn-primary" onClick={handleSeedDemo} disabled={seedingDemo}>
                 {seedingDemo ? "Loading demo records..." : "Load 55% proof dataset"}

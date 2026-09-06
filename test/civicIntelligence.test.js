@@ -119,4 +119,12 @@ test("labels demo records and calculates the planned proof dataset honestly", ()
   assert.equal(lifecycle.filter((item) => item.status === "resolved").length, 20);
   assert.equal(lifecycle.filter((item) => item.status === "archived").length, 13);
   assert.ok(lifecycle.every((item) => item.privateReport.description.startsWith("[SYNTHETIC DEMO")));
+
+  const combined = [
+    ...Array.from({ length: 12 }, () => ({ status: "pending" })),
+    ...lifecycle,
+  ];
+  assert.equal(combined.length, 60);
+  assert.equal(combined.filter((item) => item.status === "pending").length, 15);
+  assert.equal(getResolutionRate(combined), 55);
 });
